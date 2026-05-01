@@ -70,8 +70,8 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 6. Protéger /portal (End Customer)
-  if (pathname === '/portal') {
+  // 6. Protéger /portal/dashboard (End Customer)
+  if (pathname.startsWith('/portal/dashboard')) {
     const customerToken = request.cookies.get('customer_session')?.value;
     if (!customerToken) {
       return NextResponse.redirect(new URL('/portal/login', request.url));

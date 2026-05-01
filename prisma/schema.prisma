@@ -118,6 +118,12 @@ enum DurationUnit {
   YEAR
 }
 
+enum AccessType {
+  HOTSPOT_WIFI
+  WIRED_ETHERNET
+  PPPOE
+}
+
 enum DeviceChangeStatus {
   PENDING
   APPROVED
@@ -239,6 +245,7 @@ model Plan {
   price             Decimal
   durationValue     Int           @default(30)
   durationUnit      DurationUnit  @default(DAY)
+  accessType        AccessType    @default(HOTSPOT_WIFI)
   downloadLimitMbps Int
   uploadLimitMbps   Int
   createdAt         DateTime @default(now())
@@ -268,6 +275,7 @@ model Customer {
   lastPaymentAt DateTime?
   nextDueAt DateTime?
   gracePeriodDays Int @default(0)
+  accessType AccessType @default(HOTSPOT_WIFI)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
@@ -508,6 +516,7 @@ model AccessToken {
   router             Router?      @relation(fields: [routerId], references: [id], onDelete: SetNull)
   token              String       @unique
   status             TokenStatus  @default(UNUSED)
+  accessType         AccessType   @default(HOTSPOT_WIFI)
   generatedByUserId  String
   generatedByUser    User         @relation("TokenGenerator", fields: [generatedByUserId], references: [id], onDelete: Restrict)
   assignedCustomerId String?

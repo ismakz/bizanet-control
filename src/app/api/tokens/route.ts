@@ -35,7 +35,7 @@ export async function GET(req: Request) {
       where: { ...tenantWhere, ...agentWhere },
       orderBy: { createdAt: "desc" },
       include: {
-        plan: { select: { name: true, durationValue: true, durationUnit: true, downloadLimitMbps: true, uploadLimitMbps: true } },
+        plan: { select: { name: true, durationValue: true, durationUnit: true, downloadLimitMbps: true, uploadLimitMbps: true, accessType: true } },
         assignedCustomer: { select: { fullName: true, username: true } },
         generatedByUser: { select: { fullName: true } },
         company: { select: { name: true, city: true, ownerPhone: true } }
@@ -111,7 +111,8 @@ export async function POST(req: Request) {
             status: TokenStatus.UNUSED,
             generatedByUserId: auth.userId,
             price: plan.price,
-            currency: company.currency
+            currency: company.currency,
+            accessType: plan.accessType
           }
         });
 

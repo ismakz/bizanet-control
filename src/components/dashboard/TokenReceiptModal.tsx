@@ -117,9 +117,28 @@ export function TokenReceiptModal({ tokenData, onClose }: TokenReceiptModalProps
 
           {/* Instructions */}
           <div className="text-xs font-medium text-black/60 space-y-1 mb-6">
-            <p>1. Connectez-vous au réseau Wi-Fi</p>
-            <p>2. Scannez le QR code ou allez sur la page de connexion</p>
-            <p>3. Entrez le code comme Identifiant et Mot de passe</p>
+            {tokenData.plan.accessType === "PPPOE" ? (
+              <>
+                <p>1. Connectez le routeur au réseau</p>
+                <p>2. Configurez la connexion PPPoE</p>
+                <p>3. Nom d'utilisateur : {tokenData.token}</p>
+                <p>4. Mot de passe : {tokenData.token}</p>
+              </>
+            ) : tokenData.plan.accessType === "WIRED_ETHERNET" ? (
+              <>
+                <p>1. Branchez votre câble réseau</p>
+                <p>2. Ouvrez la page d'activation</p>
+                <p>3. Entrez le code ou détectez votre appareil</p>
+                <p>4. Internet activé</p>
+              </>
+            ) : (
+              <>
+                <p>1. Connectez-vous au WiFi BizaNet</p>
+                <p>2. Ouvrez la page d'activation si besoin</p>
+                <p>3. Scannez le QR ou entrez le token</p>
+                <p>4. Internet activé</p>
+              </>
+            )}
           </div>
 
           <div className="border-t-2 border-dashed border-black/20 my-6"></div>

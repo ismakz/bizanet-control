@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Server, Activity, Clock, Users } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Wifi, EthernetPort, Network } from "lucide-react";
 
 type RouterItem = {
   id: string;
@@ -106,17 +107,57 @@ export default function RouterStatusPage() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-white/5">
-              <button 
-                onClick={() => alert("Fonctionnalité de redémarrage en cours de développement.")}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10 transition"
-              >
-                Redémarrer le routeur
-              </button>
-            </div>
+              <div className="pt-4 border-t border-white/5">
+                <RouterStats routerId={router.id} />
+              </div>
+
+              <div className="pt-4 border-t border-white/5">
+                <button 
+                  onClick={() => alert("Fonctionnalité de redémarrage en cours de développement.")}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10 transition"
+                >
+                  Redémarrer le routeur
+                </button>
+              </div>
           </div>
         ))}
       </div>
     </div>
   );
 }
+
+function RouterStats({ routerId }: { routerId: string }) {
+  const [stats, setStats] = useState<{wifiCount: number, dhcpCount: number, pppoeCount: number} | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/routers/${routerId}/stats`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d && !d.error) setStats(d);
+      })
+      .catch(() => {});
+  }, [routerId]);
+
+  if (!stats) return <div className="text-xs text-white/40 text-center py-2">Chargement statistiques...</div>;
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <div className="bg-black/30 rounded-lg p-2 text-center border border-white/5">
+        <Wifi className="w-4 h-4 text-cyan mx-auto mb-1" />
+        <div className="text-lg font-bold text-white">{stats.wifiCount}</div>
+        <div className="text-[10px] text-white/50 uppercase">WiFi</div>
+      </div>
+      <div className="bg-black/30 rounded-lg p-2 text-center border border-white/5">
+        <Network className="w-4 h-4 text-cyan mx-auto mb-1" />
+        <div className="text-lg font-bold text-white">{stats.dhcpCount}</div>
+        <div className="text-[10px] text-white/50 uppercase">Câble</div>
+      </div>
+      <div className="bg-black/30 rounded-lg p-2 text-center border border-white/5">
+        <Server className="w-4 h-4 text-cyan mx-auto mb-1" />
+        <div className="text-lg font-bold text-white">{stats.pppoeCount}</div>
+        <div className="text-[10px] text-white/50 uppercase">PPPoE</div>
+      </div>
+    </div>
+  );
+}
+

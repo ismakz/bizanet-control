@@ -85,6 +85,7 @@ export default function GenerateTokensPage() {
             <div key={idx} className="bg-black/30 border border-white/10 rounded-xl p-4 text-center flex flex-col justify-between">
               <div className="space-y-2 mb-4">
                 <div className="font-mono text-xl text-cyan font-semibold tracking-widest">{t.token}</div>
+                <div className="text-xs text-white/60 mb-1">Type: {t.plan.accessType}</div>
                 <div className="text-xs text-white/40">Montant : {t.price} {t.currency}</div>
               </div>
               <button 
@@ -158,7 +159,7 @@ export default function GenerateTokensPage() {
               <option value="" disabled className="bg-[#050A10]">-- Sélectionner --</option>
               {plans.map(p => (
                 <option key={p.id} value={p.id} className="bg-[#050A10]">
-                  {p.name} - {formatCurrency(p.price, currency)} ({formatDuration(p.durationValue, p.durationUnit)})
+                  [{p.accessType}] {p.name} - {formatCurrency(p.price, currency)} ({formatDuration(p.durationValue, p.durationUnit)})
                 </option>
               ))}
             </select>

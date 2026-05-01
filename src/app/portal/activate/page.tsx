@@ -13,6 +13,8 @@ function ActivateTokenForm() {
   const [isDeviceMismatch, setIsDeviceMismatch] = useState(false);
   const [requestChangeLoading, setRequestChangeLoading] = useState(false);
   const [requestChangeSuccess, setRequestChangeSuccess] = useState(false);
+  const [isMacRequired, setIsMacRequired] = useState(false);
+  const [macAddress, setMacAddress] = useState("");
   const [successData, setSuccessData] = useState<{ username: string; password: string; expiresAt: string } | null>(null);
 
   // Get or generate device ID
@@ -46,7 +48,8 @@ function ActivateTokenForm() {
           token, 
           phone: phone || undefined,
           deviceId: getDeviceId(),
-          userAgent: window.navigator.userAgent 
+          userAgent: window.navigator.userAgent,
+          macAddress: isMacRequired ? macAddress : undefined
         }),
       });
 
@@ -56,14 +59,20 @@ function ActivateTokenForm() {
           setIsDeviceMismatch(true);
           throw new Error("Ce code est déjà lié à un autre appareil.");
         }
+        if (data.error === "MAC_NOT_DETECTED") {
+          setIsMacRequired(true);
+          throw new Error("Votre adresse MAC n'a pas pu être détectée automatiquement. Veuillez la saisir manuellement.");
+        }
         throw new Error(data.error || "Erreur d'activation");
       }
 
-      setSuccessData({
+      sessionStorage.setItem("bizanet_activation_success", JSON.stringify({
         username: data.username,
         password: data.password,
-        expiresAt: new Date(data.expiresAt).toLocaleString()
-      });
+        expiresAt: new Date(data.expiresAt).toLocaleString(),
+        plan: data.planName || "Forfait BizaNet"
+      }));
+      window.location.href = "/portal/success";
     } catch (err: any) {
       if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
         setError("Activation impossible pour le moment. Réessayez quand la connexion revient.");
@@ -105,26 +114,9 @@ function ActivateTokenForm() {
           <CheckCircle className="w-8 h-8" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-white mb-2">Accès Activé !</h2>
-          <p className="text-sm text-white/60">Votre connexion internet est maintenant active.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Redirection...</h2>
+          <p className="text-sm text-white/60">Veuillez patienter.</p>
         </div>
-
-        <div className="bg-black/20 rounded-xl p-4 text-left space-y-3 border border-white/5">
-          <div>
-            <div className="text-xs text-white/40 mb-1">Nom d'utilisateur (PPPoE/Hotspot)</div>
-            <div className="font-mono text-cyan font-medium bg-black/40 px-3 py-2 rounded-lg">{successData.username}</div>
-          </div>
-          <div>
-            <div className="text-xs text-white/40 mb-1">Mot de passe</div>
-            <div className="font-mono text-cyan font-medium bg-black/40 px-3 py-2 rounded-lg">{successData.password}</div>
-          </div>
-          <div>
-            <div className="text-xs text-white/40 mb-1">Valide jusqu'au</div>
-            <div className="text-sm text-white">{successData.expiresAt}</div>
-          </div>
-        </div>
-
-        <p className="text-xs text-white/40">Veuillez configurer votre routeur avec ces identifiants.</p>
       </div>
     );
   }
@@ -202,6 +194,21 @@ function ActivateTokenForm() {
             className="form-input text-center"
           />
         </div>
+
+        {isMacRequired && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-white/60">Adresse MAC (Câble Ethernet)</label>
+            <input
+              required
+              type="text"
+              value={macAddress}
+              onChange={(e) => setMacAddress(e.target.value.toUpperCase())}
+              placeholder="AA:BB:CC:DD:EE:FF"
+              className="form-input text-center font-mono"
+            />
+            <p className="text-[10px] text-orange-400 mt-1">Nécessaire car la détection automatique a échoué.</p>
+          </div>
+        )}
 
         <button
           type="submit"

@@ -70,9 +70,27 @@ export function BatchTokenPrintModal({ tokens, onClose }: BatchTokenPrintModalPr
                 </div>
 
                 <div className="text-xs font-medium text-black/60 space-y-1 mb-4">
-                  <p>1. Connectez-vous au réseau Wi-Fi</p>
-                  <p>2. Scannez le QR code</p>
-                  <p>3. Activez votre accès !</p>
+                  {tokenData.plan.accessType === "PPPOE" ? (
+                    <>
+                      <p>1. Connectez le routeur au réseau</p>
+                      <p>2. Configurez la connexion PPPoE</p>
+                      <p>3. Identifiant/Mot de passe : {tokenData.token}</p>
+                    </>
+                  ) : tokenData.plan.accessType === "WIRED_ETHERNET" ? (
+                    <>
+                      <p>1. Branchez votre câble réseau</p>
+                      <p>2. Ouvrez la page d'activation</p>
+                      <p>3. Entrez le code ou détectez votre appareil</p>
+                      <p>4. Internet activé</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>1. Connectez-vous au WiFi BizaNet</p>
+                      <p>2. Ouvrez la page d'activation si besoin</p>
+                      <p>3. Scannez le QR ou entrez le token</p>
+                      <p>4. Internet activé</p>
+                    </>
+                  )}
                 </div>
                 
                 <div className="text-[10px] text-black/40 uppercase">

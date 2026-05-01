@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { Role, DurationUnit } from "@prisma/client";
+import { Role, DurationUnit, AccessType } from "@prisma/client";
 import { getAuthContextFromRequest } from "@/lib/auth";
 import { getTenantWhere, requireOneOfRoles, resolveWriteCompanyId } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
@@ -11,6 +11,7 @@ const planSchema = z.object({
   price: z.coerce.number().positive(),
   durationValue: z.coerce.number().int().positive(),
   durationUnit: z.nativeEnum(DurationUnit),
+  accessType: z.nativeEnum(AccessType),
   downloadLimitMbps: z.coerce.number().int().positive(),
   uploadLimitMbps: z.coerce.number().int().positive()
 });
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
         price: parsed.price,
         durationValue: parsed.durationValue,
         durationUnit: parsed.durationUnit,
+        accessType: parsed.accessType,
         downloadLimitMbps: parsed.downloadLimitMbps,
         uploadLimitMbps: parsed.uploadLimitMbps
       }

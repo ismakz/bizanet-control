@@ -5,7 +5,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { Package, Plus } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { formatDuration } from "@/lib/time";
-import { DurationUnit } from "@prisma/client";
+import { DurationUnit, AccessType } from "@prisma/client";
 
 type Plan = {
   id: string;
@@ -13,6 +13,7 @@ type Plan = {
   price: string;
   durationValue: number;
   durationUnit: DurationUnit;
+  accessType: AccessType;
   downloadLimitMbps: number;
   uploadLimitMbps: number;
   createdAt: string;
@@ -30,6 +31,7 @@ export default function PlansPage() {
     price: "0",
     durationValue: 30,
     durationUnit: "DAY" as DurationUnit,
+    accessType: "HOTSPOT_WIFI" as AccessType,
     downloadLimitMbps: 10,
     uploadLimitMbps: 5
   });
@@ -79,6 +81,7 @@ export default function PlansPage() {
         price: "0",
         durationValue: 30,
         durationUnit: "DAY" as DurationUnit,
+        accessType: "HOTSPOT_WIFI" as AccessType,
         downloadLimitMbps: 10,
         uploadLimitMbps: 5
       });
@@ -94,6 +97,15 @@ export default function PlansPage() {
     {
       header: "Durée",
       cell: (p: Plan) => formatDuration(p.durationValue, p.durationUnit)
+    },
+    {
+      header: "Type",
+      cell: (p: Plan) => {
+        if (p.accessType === "HOTSPOT_WIFI") return "WiFi Hotspot";
+        if (p.accessType === "WIRED_ETHERNET") return "Câble Ethernet";
+        if (p.accessType === "PPPOE") return "PPPoE";
+        return p.accessType;
+      }
     },
     { 
       header: "Téléchargement", 
@@ -171,6 +183,20 @@ export default function PlansPage() {
                 </select>
               </Field>
             </div>
+
+            <Field label="Type d'accès">
+              <select
+                value={form.accessType}
+                onChange={(ev) =>
+                  setForm((s) => ({ ...s, accessType: ev.target.value as AccessType }))
+                }
+                className="form-select"
+              >
+                <option value="HOTSPOT_WIFI" className="bg-[#050A10]">WiFi Hotspot</option>
+                <option value="WIRED_ETHERNET" className="bg-[#050A10]">Câble Ethernet</option>
+                <option value="PPPOE" className="bg-[#050A10]">PPPoE</option>
+              </select>
+            </Field>
 
             <div className="grid grid-cols-2 gap-4">
               <Field label="Max Download (Mbps)">

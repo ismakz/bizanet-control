@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { TokenStatus, CustomerStatus, SubscriptionStatus } from "@prisma/client";
+import { TokenStatus, CustomerStatus, SubscriptionStatus, AccessType } from "@prisma/client";
 import { writeAuditLog } from "@/lib/audit";
+import { 
+  createHotspotUser, 
+  getDhcpLeases, 
+  createDhcpMacBinding, 
+  activateWiredClient, 
+  createPppoeSecret 
+} from "@/lib/mikrotik";
 
 const activateTokenSchema = z.object({
   token: z.string().min(1),
   phone: z.string().optional(),
   deviceId: z.string().min(1),
-  userAgent: z.string().optional()
+  userAgent: z.string().optional(),
+  macAddress: z.string().optional()
 });
 
 export async function POST(req: Request) {
@@ -28,6 +36,25 @@ export async function POST(req: Request) {
 
     if (!accessToken) {
       return NextResponse.json({ error: "Code d'accès invalide." }, { status: 404 });
+    }
+
+    const accessType = accessToken.plan.accessType || "HOTSPOT_WIFI";
+    let finalMacAddress = parsed.macAddress;
+
+    // Detection MAC logic for Wired Ethernet
+    if (accessType === "WIRED_ETHERNET" && !finalMacAddress) {
+      if (!accessToken.routerId) {
+        return NextResponse.json({ error: "Aucun routeur associé à ce token pour détecter la MAC." }, { status: 400 });
+      }
+      const clientIp = req.headers.get("x-forwarded-for")?.split(',')[0] || req.headers.get("x-real-ip") || "127.0.0.1";
+      const leases = await getDhcpLeases(accessToken.routerId);
+      const matchingLease = leases.find((l: any) => l.address === clientIp);
+      
+      if (matchingLease && matchingLease["mac-address"]) {
+        finalMacAddress = matchingLease["mac-address"];
+      } else {
+        return NextResponse.json({ error: "MAC_NOT_DETECTED" }, { status: 400 });
+      }
     }
 
     const now = new Date();
@@ -71,7 +98,8 @@ export async function POST(req: Request) {
           message: "Accès récupéré avec succès",
           expiresAt: existingCustomer.expiresAt,
           username: existingCustomer.username,
-          password: existingCustomer.password
+          password: existingCustomer.password,
+          planName: accessToken.plan.name
         }, { status: 200 });
       }
     }
@@ -93,7 +121,8 @@ export async function POST(req: Request) {
         expiresAt,
         phone: parsed.phone || null,
         fullName: `Client Token ${tokenStr}`,
-        routerId: accessToken.routerId
+        routerId: accessToken.routerId,
+        accessType
       }
     });
 
@@ -125,7 +154,38 @@ export async function POST(req: Request) {
       }
     });
 
-    // 6. Mettre à jour le Token avec le DeviceId
+    // 6. Network Activation
+    let activationSuccess = false;
+    try {
+      if (accessType === "HOTSPOT_WIFI") {
+        await createHotspotUser(customer.id);
+        activationSuccess = true;
+      } else if (accessType === "WIRED_ETHERNET") {
+        const clientIp = req.headers.get("x-forwarded-for")?.split(',')[0] || "127.0.0.1";
+        await createDhcpMacBinding(accessToken.routerId!, finalMacAddress!, clientIp);
+        await activateWiredClient(customer.id, finalMacAddress!);
+        activationSuccess = true;
+      } else if (accessType === "PPPOE") {
+        await createPppoeSecret(customer.id);
+        activationSuccess = true;
+      }
+      
+      if (activationSuccess) {
+        await prisma.internetSubscription.update({
+          where: { id: subscription.id },
+          data: { networkActivationStatus: "SUCCESS" }
+        });
+      }
+    } catch (networkErr: any) {
+      console.error("Network activation failed during portal activate:", networkErr);
+      await prisma.internetSubscription.update({
+        where: { id: subscription.id },
+        data: { networkActivationStatus: "FAILED" }
+      });
+      // Non bloquant : Le compte est créé, on peut réessayer via le dashboard.
+    }
+
+    // 7. Mettre à jour le Token avec le DeviceId
     await prisma.accessToken.update({
       where: { id: accessToken.id },
       data: {
@@ -151,7 +211,8 @@ export async function POST(req: Request) {
       message: "Accès activé avec succès",
       expiresAt: expiresAt,
       username: customer.username,
-      password: customer.password
+      password: customer.password,
+      planName: accessToken.plan.name
     }, { status: 200 });
 
   } catch (e: unknown) {

@@ -313,3 +313,315 @@ export async function getActiveUsers(routerId: string) {
     client.close();
   }
 }
+
+// --- PPPoE Functions ---
+
+export async function createPppoeSecret(customerId: string) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { router: true, subscriptions: { include: { plan: true }, where: { status: "ACTIVE" } } },
+  });
+
+  if (!customer) throw new Error("Customer introuvable");
+  if (!customer.router) throw new Error("Aucun routeur assigné au client");
+  if (!customer.subscriptions || customer.subscriptions.length === 0) throw new Error("Aucune souscription active trouvée");
+
+  const plan = customer.subscriptions[0].plan;
+  const profileName = `bizanet-pppoe-${plan.id}`;
+  const client = await connectRouter(customer.router);
+
+  try {
+    const profileMenu = (client as any).menu("/ppp profile");
+    const profiles = await profileMenu.where("name", profileName).get();
+    if (profiles.length === 0) {
+      await profileMenu.add({
+        name: profileName,
+        "rate-limit": `${plan.uploadLimitMbps}M/${plan.downloadLimitMbps}M`,
+        "only-one": "yes",
+      });
+    } else {
+      await profileMenu.where("name", profileName).set({
+        "rate-limit": `${plan.uploadLimitMbps}M/${plan.downloadLimitMbps}M`,
+        "only-one": "yes",
+      });
+    }
+
+    const secretMenu = (client as any).menu("/ppp secret");
+    const secrets = await secretMenu.where("name", customer.username).get();
+    if (secrets.length === 0) {
+      await secretMenu.add({
+        name: customer.username,
+        password: customer.password,
+        service: "pppoe",
+        profile: profileName,
+      });
+    } else {
+      await secretMenu.where("name", customer.username).set({
+        password: customer.password,
+        service: "pppoe",
+        profile: profileName,
+      });
+    }
+  } catch (error: any) {
+    await handleMikroTikFailure("CREATE_USER", customer.router.id, customer.companyId, customer.id, error);
+    throw error;
+  } finally {
+    client.close();
+  }
+}
+
+export async function activatePppoeSecret(customerId: string) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { router: true },
+  });
+
+  if (!customer || !customer.router) return;
+
+  const client = await connectRouter(customer.router);
+  try {
+    const secretMenu = (client as any).menu("/ppp secret");
+    const secrets = await secretMenu.where("name", customer.username).get();
+    if (secrets.length > 0) {
+      await secretMenu.where("name", customer.username).enable();
+    }
+    
+    // Disconnect active session to force reconnect with new status
+    const activeMenu = (client as any).menu("/ppp active");
+    const activeSessions = await activeMenu.where("name", customer.username).get();
+    for (const session of activeSessions) {
+      if (session[".id"]) {
+        await activeMenu.remove(session[".id"]);
+      }
+    }
+  } catch (error: any) {
+    await handleMikroTikFailure("ACTIVATE", customer.router.id, customer.companyId, customer.id, error);
+  } finally {
+    client.close();
+  }
+}
+
+export async function suspendPppoeSecret(customerId: string) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { router: true },
+  });
+
+  if (!customer || !customer.router) return;
+
+  const client = await connectRouter(customer.router);
+  try {
+    const secretMenu = (client as any).menu("/ppp secret");
+    const secrets = await secretMenu.where("name", customer.username).get();
+    if (secrets.length > 0) {
+      await secretMenu.where("name", customer.username).disable();
+    }
+    
+    // Disconnect active session
+    const activeMenu = (client as any).menu("/ppp active");
+    const activeSessions = await activeMenu.where("name", customer.username).get();
+    for (const session of activeSessions) {
+      if (session[".id"]) {
+        await activeMenu.remove(session[".id"]);
+      }
+    }
+  } catch (error: any) {
+    await handleMikroTikFailure("SUSPEND", customer.router.id, customer.companyId, customer.id, error);
+  } finally {
+    client.close();
+  }
+}
+
+export async function deletePppoeSecret(customerId: string) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { router: true },
+  });
+
+  if (!customer || !customer.router) return;
+
+  const client = await connectRouter(customer.router);
+  try {
+    const secretMenu = (client as any).menu("/ppp secret");
+    const secrets = await secretMenu.where("name", customer.username).get();
+    if (secrets.length > 0 && secrets[0][".id"]) {
+      await secretMenu.remove(secrets[0][".id"]);
+    }
+  } catch (error) {
+    console.error("Error deleting PPPoE user:", error);
+  } finally {
+    client.close();
+  }
+}
+
+export async function getPppoeActiveUsers(routerId: string) {
+  const router = await prisma.router.findUnique({ where: { id: routerId } });
+  if (!router) throw new Error("Router introuvable");
+
+  const client = await connectRouter(router);
+  try {
+    if (isMockMode) return [];
+    const activeMenu = (client as any).menu("/ppp active");
+    return await activeMenu.get();
+  } catch (error: any) {
+    console.error("Error getting active PPPoE users:", error.message);
+    return [];
+  } finally {
+    client.close();
+  }
+}
+
+// --- Wired Ethernet Functions ---
+
+export async function getDhcpLeases(routerId: string) {
+  const router = await prisma.router.findUnique({ where: { id: routerId } });
+  if (!router) throw new Error("Router introuvable");
+
+  const client = await connectRouter(router);
+  try {
+    if (isMockMode) {
+      return [
+        { "mac-address": "AA:BB:CC:DD:EE:FF", "address": "192.168.1.50", "status": "bound", "host-name": "Desktop-PC" }
+      ];
+    }
+    const leaseMenu = (client as any).menu("/ip dhcp-server lease");
+    return await leaseMenu.get();
+  } catch (error: any) {
+    console.error("Error getting DHCP leases:", error.message);
+    return [];
+  } finally {
+    client.close();
+  }
+}
+
+export async function createDhcpMacBinding(routerId: string, macAddress: string, ipAddress: string) {
+  const router = await prisma.router.findUnique({ where: { id: routerId } });
+  if (!router) throw new Error("Router introuvable");
+
+  const client = await connectRouter(router);
+  try {
+    const leaseMenu = (client as any).menu("/ip dhcp-server lease");
+    const leases = await leaseMenu.where("mac-address", macAddress).get();
+    
+    if (leases.length > 0) {
+      const lease = leases[0];
+      if (lease.dynamic === "true" || lease.dynamic === true) {
+        // Make static
+        await (client as any).write([
+          "/ip/dhcp-server/lease/make-static",
+          `=numbers=${lease[".id"]}`
+        ]);
+      }
+    } else {
+      // Create static lease
+      await leaseMenu.add({
+        "mac-address": macAddress,
+        "address": ipAddress,
+        comment: "bizanet-wired"
+      });
+    }
+  } catch (error: any) {
+    console.error("Error creating DHCP MAC binding:", error.message);
+  } finally {
+    client.close();
+  }
+}
+
+export async function activateWiredClient(customerId: string, macAddress: string) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { router: true, subscriptions: { include: { plan: true }, where: { status: "ACTIVE" } } },
+  });
+
+  if (!customer || !customer.router) return;
+  if (!customer.subscriptions || customer.subscriptions.length === 0) return;
+
+  const plan = customer.subscriptions[0].plan;
+  const queueName = `bizanet-wired-${customer.username}`;
+  
+  const client = await connectRouter(customer.router);
+  try {
+    // Determine the IP address from DHCP lease to create the Simple Queue
+    const leaseMenu = (client as any).menu("/ip dhcp-server lease");
+    const leases = await leaseMenu.where("mac-address", macAddress).get();
+    let targetIp = leases.length > 0 ? leases[0].address : null;
+
+    if (!targetIp) throw new Error(`No IP found for MAC ${macAddress}`);
+
+    // Create or update Simple Queue
+    const queueMenu = (client as any).menu("/queue simple");
+    const queues = await queueMenu.where("name", queueName).get();
+    
+    const rateLimit = `${plan.uploadLimitMbps}M/${plan.downloadLimitMbps}M`;
+    
+    if (queues.length === 0) {
+      await queueMenu.add({
+        name: queueName,
+        target: targetIp,
+        "max-limit": rateLimit,
+        comment: "bizanet-wired"
+      });
+    } else {
+      await queueMenu.where("name", queueName).set({
+        target: targetIp,
+        "max-limit": rateLimit,
+        disabled: "no"
+      });
+    }
+  } catch (error: any) {
+    await handleMikroTikFailure("ACTIVATE", customer.router.id, customer.companyId, customer.id, error);
+  } finally {
+    client.close();
+  }
+}
+
+export async function suspendWiredClient(customerId: string) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { router: true },
+  });
+
+  if (!customer || !customer.router) return;
+
+  const queueName = `bizanet-wired-${customer.username}`;
+  const client = await connectRouter(customer.router);
+  try {
+    const queueMenu = (client as any).menu("/queue simple");
+    const queues = await queueMenu.where("name", queueName).get();
+    if (queues.length > 0) {
+      // Limit to 1k/1k effectively suspending
+      await queueMenu.where("name", queueName).set({
+        "max-limit": "1k/1k"
+      });
+    }
+    
+    // Optionally: drop existing connections for that IP so it takes effect immediately
+  } catch (error: any) {
+    await handleMikroTikFailure("SUSPEND", customer.router.id, customer.companyId, customer.id, error);
+  } finally {
+    client.close();
+  }
+}
+
+export async function deleteWiredClient(customerId: string) {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: { router: true },
+  });
+
+  if (!customer || !customer.router) return;
+
+  const queueName = `bizanet-wired-${customer.username}`;
+  const client = await connectRouter(customer.router);
+  try {
+    const queueMenu = (client as any).menu("/queue simple");
+    const queues = await queueMenu.where("name", queueName).get();
+    if (queues.length > 0 && queues[0][".id"]) {
+      await queueMenu.remove(queues[0][".id"]);
+    }
+  } catch (error) {
+    console.error("Error deleting Wired user queue:", error);
+  } finally {
+    client.close();
+  }
+}
