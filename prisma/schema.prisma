@@ -130,6 +130,19 @@ enum DeviceChangeStatus {
   REJECTED
 }
 
+enum KycStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TokenRisk {
+  NORMAL
+  WATCH
+  BLOCKED
+}
+
 model Company {
   id         String        @id @default(cuid())
   name      String
@@ -172,6 +185,7 @@ model User {
   email        String?    @unique
   passwordHash String
   mustChangePassword Boolean @default(true)
+  kycStatus    KycStatus @default(NOT_SUBMITTED)
   role         Role
   companyId    String?
   company      Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
@@ -516,6 +530,7 @@ model AccessToken {
   router             Router?      @relation(fields: [routerId], references: [id], onDelete: SetNull)
   token              String       @unique
   status             TokenStatus  @default(UNUSED)
+  riskLevel          TokenRisk    @default(NORMAL)
   accessType         AccessType   @default(HOTSPOT_WIFI)
   generatedByUserId  String
   generatedByUser    User         @relation("TokenGenerator", fields: [generatedByUserId], references: [id], onDelete: Restrict)
@@ -589,4 +604,25 @@ model DeviceChangeRequest {
   @@index([companyId])
   @@index([status])
   @@map("device_change_requests")
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  ipAddress String
+  phone     String
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([ipAddress, createdAt])
+  @@index([phone, createdAt])
+  @@map("login_attempts")
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
 }
