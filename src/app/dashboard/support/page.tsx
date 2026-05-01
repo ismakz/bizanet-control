@@ -1,101 +1,106 @@
 "use client";
 
 import { useState } from "react";
-import { LifeBuoy, Send, MessageSquare } from "lucide-react";
+import { Search, ServerCrash, RefreshCw, KeyRound, User, ChevronRight } from "lucide-react";
 
 export default function SupportPage() {
-  const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (query.length < 3) return;
+    
     setLoading(true);
-
-    // Simulation de l'envoi du ticket (à connecter avec l'API BizaNet plus tard)
-    setTimeout(() => {
+    try {
+      const res = await fetch(`/api/support/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      setResults(data.results || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
       setLoading(false);
-      setSuccess(true);
-      setSubject("");
-      setMessage("");
-    }, 1500);
+    }
+  };
+
+  const retryActivation = async (subscriptionId: string) => {
+    try {
+      await fetch(`/api/subscriptions/${subscriptionId}/retry-activation`, { method: "POST" });
+      alert("Demande de réactivation réseau envoyée au routeur.");
+    } catch (err) {
+      alert("Erreur lors de la réactivation");
+    }
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
+    <div className="space-y-8">
       <div className="flex items-center gap-3">
         <div className="p-2.5 rounded-xl bg-blue/10 text-blue">
-          <LifeBuoy className="w-6 h-6" />
+          <Search className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white">Support Technique</h1>
-          <p className="text-sm text-white/50 mt-1">Contactez l'équipe BizaNet pour toute assistance</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">Support Premium</h1>
+          <p className="text-sm text-white/50 mt-1">Recherchez un client ou un token pour diagnostiquer les problèmes.</p>
         </div>
       </div>
 
-      {success && (
-        <div className="rounded-xl border border-green-500/20 bg-green-500/10 p-6 text-center space-y-3">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-500/20 text-green-400 mb-2">
-            <MessageSquare className="w-6 h-6" />
-          </div>
-          <h3 className="text-lg font-medium text-white">Message envoyé avec succès</h3>
-          <p className="text-sm text-white/60">Notre équipe de support technique vous répondra dans les plus brefs délais.</p>
-          <button 
-            onClick={() => setSuccess(false)}
-            className="mt-4 px-4 py-2 text-sm font-medium text-white/60 hover:text-white transition"
-          >
-            Envoyer un autre message
-          </button>
-        </div>
-      )}
+      <form onSubmit={handleSearch} className="flex gap-4">
+        <input 
+          type="text" 
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Téléphone, Token (BN-...), Nom..."
+          className="form-input flex-1 max-w-xl"
+        />
+        <button type="submit" disabled={loading} className="btn-primary">
+          {loading ? "Recherche..." : "Chercher"}
+        </button>
+      </form>
 
-      {!success && (
-        <form onSubmit={handleSubmit} className="card p-6 space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-white/60">Sujet de votre demande</label>
-              <input
-                required
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Ex: Problème d'activation réseau..."
-                className="form-input"
-              />
+      <div className="space-y-4 mt-8">
+        {results.length === 0 && !loading && query.length >= 3 && (
+          <div className="text-white/40 text-sm">Aucun résultat trouvé pour "{query}".</div>
+        )}
+        
+        {results.map((r, i) => (
+          <div key={i} className="card p-6 border-white/5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/5 rounded-lg text-white/50">
+                  {r.type === "TOKEN" ? <KeyRound className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">{r.title}</h3>
+                  <div className="text-sm text-white/50">{r.subtitle}</div>
+                </div>
+              </div>
             </div>
+
+            <div className="p-4 bg-black/20 rounded-xl border border-white/5 text-xs text-white/70 space-y-2 font-mono overflow-auto">
+              <pre>{JSON.stringify(r.details, null, 2)}</pre>
+            </div>
+
+            {r.type === "CUSTOMER" && r.details.subscriptions?.[0] && (
+               <div className="pt-4 border-t border-white/5 flex gap-4">
+                 <button 
+                   onClick={() => retryActivation(r.details.subscriptions[0].id)}
+                   className="btn-secondary flex items-center gap-2"
+                 >
+                   <RefreshCw className="w-4 h-4" /> Relancer l'activation réseau
+                 </button>
+               </div>
+            )}
             
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-white/60">Description détaillée</label>
-              <textarea
-                required
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Décrivez votre problème en détail pour nous aider à le résoudre rapidement..."
-                className="form-input min-h-[150px] resize-y"
-              />
-            </div>
+            {r.type === "TOKEN" && r.details.riskLevel !== "NORMAL" && (
+               <div className="pt-4 border-t border-white/5 flex gap-4">
+                 <div className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-bold flex items-center gap-2">
+                   <ServerCrash className="w-4 h-4" /> ALERTE ANTI-FRAUDE : {r.details.riskLevel}
+                 </div>
+               </div>
+            )}
           </div>
-
-          <div className="pt-2 border-t border-white/5">
-            <button
-              type="submit"
-              disabled={loading || !subject || !message}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue px-4 py-3 text-sm font-semibold text-white hover:bg-blue/90 transition shadow-[0_0_15px_rgba(79,172,254,0.3)] disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-              {loading ? "Envoi en cours..." : "Envoyer la demande"}
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 flex gap-4">
-        <LifeBuoy className="w-5 h-5 text-white/40 flex-shrink-0" />
-        <div className="space-y-1 text-sm text-white/60">
-          <p>Le support BizaNet est disponible du lundi au samedi, de 8h à 18h (GMT+1).</p>
-          <p>En cas d'urgence hors de ces horaires, veuillez contacter votre gestionnaire de compte directement par téléphone.</p>
-        </div>
+        ))}
       </div>
     </div>
   );

@@ -8,6 +8,8 @@ type AuditInput = {
   action: string;
   entityType: string;
   message: string;
+  severity?: string;
+  ipAddress?: string;
 };
 
 export async function writeAuditLog(input: AuditInput): Promise<void> {
@@ -18,6 +20,8 @@ export async function writeAuditLog(input: AuditInput): Promise<void> {
       action: input.action,
       entityType: input.entityType,
       message: input.message,
+      severity: input.severity || "INFO",
+      ipAddress: input.ipAddress || null,
     },
   });
 }

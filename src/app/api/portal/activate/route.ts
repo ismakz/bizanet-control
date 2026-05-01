@@ -38,6 +38,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Code d'accès invalide." }, { status: 404 });
     }
 
+    if (accessToken.riskLevel === "BLOCKED") {
+      return NextResponse.json({ error: "Ce code a été bloqué suite à une activité suspecte. Veuillez contacter le support." }, { status: 403 });
+    }
+
     const accessType = accessToken.plan.accessType || "HOTSPOT_WIFI";
     let finalMacAddress = parsed.macAddress;
 
@@ -62,6 +66,12 @@ export async function POST(req: Request) {
     // 2. Vérification du Device Binding si le token est déjà actif
     if (accessToken.status === TokenStatus.ACTIVE) {
       if (accessToken.boundDeviceId && accessToken.boundDeviceId !== parsed.deviceId) {
+        // Mettre le token sous surveillance
+        await prisma.accessToken.update({
+          where: { id: accessToken.id },
+          data: { riskLevel: "WATCH" }
+        });
+
         // Log la tentative échouée
         await writeAuditLog({
           companyId: accessToken.companyId,

@@ -25,6 +25,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Solde insuffisant" }, { status: 400 });
     }
 
+    if (wallet.user.kycStatus !== "APPROVED") {
+      return NextResponse.json({ error: "KYC non validé. Vous ne pouvez pas effectuer de retrait avant d'avoir validé votre identité." }, { status: 403 });
+    }
+
     // Calcul des retraits en attente
     const pendingWithdrawals = await prisma.withdrawalRequest.aggregate({
       where: { userId: auth.userId, status: "PENDING" },
