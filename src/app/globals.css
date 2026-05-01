@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    background: #050a10;
+    color: rgba(255, 255, 255, 0.88);
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl bg-surface border border-white/5;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+  .neon-border {
+    background: linear-gradient(135deg, rgba(0, 242, 254, 0.45), rgba(79, 172, 254, 0.25));
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+  .form-input {
+    @apply w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/40 outline-none focus:border-cyan/50 focus:bg-white/10 transition-colors;
+  }
+  .form-select {
+    @apply w-full rounded-xl border border-white/10 bg-[#0B131E] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan/50 transition-colors appearance-none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right .5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}

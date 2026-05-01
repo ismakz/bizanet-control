@@ -1,0 +1,583 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum CustomerStatus {
+  LEAD
+  PENDING_PAYMENT
+  PENDING
+  ACTIVE
+  EXPIRING_SOON
+  SUSPENDED
+  EXPIRED
+  BLOCKED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+enum CommissionStatus {
+  PENDING
+  AVAILABLE
+  PAID
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionSource {
+  COMMISSION
+  WITHDRAWAL
+  MANUAL
+  ADMIN_TOPUP
+  TOKEN_SALE
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PaymentMethod {
+  CASH
+  AIRTEL_MONEY
+  MPESA
+  ORANGE_MONEY
+  MTN_MOMO
+  BIZAPAY
+  BANK_TRANSFER
+}
+
+enum Role {
+  BIZANET_CEO
+  BIZANET_SUPPORT
+  COMPANY_ADMIN
+  COMPANY_AGENT
+}
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum RouterStatus {
+  ONLINE
+  OFFLINE
+  UNKNOWN
+}
+
+enum NetworkActivationStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum TokenStatus {
+  UNUSED
+  ACTIVE
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+enum DurationUnit {
+  MINUTE
+  HOUR
+  DAY
+  MONTH
+  YEAR
+}
+
+enum DeviceChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Company {
+  id         String        @id @default(cuid())
+  name      String
+  ownerName  String        @default("")
+  ownerPhone String        @default("")
+  country    String        @default("")
+  city       String        @default("")
+  address    String?
+  saasPlan   String?
+  saasExpiresAt DateTime?
+  status     CompanyStatus @default(ACTIVE)
+  currency   String        @default("USD")
+  agentCommissionRate Float @default(5)
+  slug       String        @unique
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  users     User[]
+  routers   Router[]
+  customers Customer[]
+  plans     Plan[]
+  payments  Payment[]
+  auditLogs AuditLog[]
+  subscriptions InternetSubscription[]
+  agentCommissions AgentCommission[]
+  alerts      Alert[]
+  networkJobs NetworkJob[]
+  accessTokens AccessToken[]
+  wallets     Wallet[]
+  walletTransactions WalletTransaction[]
+  customerDevices CustomerDevice[]
+  deviceChangeRequests DeviceChangeRequest[]
+
+  @@map("companies")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  fullName     String
+  phone        String     @unique
+  email        String?    @unique
+  passwordHash String
+  mustChangePassword Boolean @default(true)
+  role         Role
+  companyId    String?
+  company      Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[] @relation("AuditActor")
+  reviewedRegistrationRequests CompanyRegistrationRequest[] @relation("ReviewedRequests")
+
+  paymentsCreated    Payment[]          @relation("PaymentCreator")
+  agentCommissions   AgentCommission[]  @relation("AgentCommissions")
+  wallet             Wallet?
+  walletTransactions WalletTransaction[]
+  createdWalletTransactions WalletTransaction[] @relation("WalletTransactionCreator")
+  withdrawalRequests WithdrawalRequest[]
+  generatedTokens    AccessToken[]      @relation("TokenGenerator")
+  reviewedDeviceChanges DeviceChangeRequest[] @relation("DeviceChangeReviewer")
+
+  @@index([companyId])
+  @@map("users")
+}
+
+model Router {
+  id                String   @id @default(cuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  name              String
+  host              String
+  username          String
+  encryptedPassword String
+  status            RouterStatus @default(UNKNOWN)
+  lastError         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  customers         Customer[]
+  subscriptions     InternetSubscription[]
+  alerts            Alert[]
+  networkJobs       NetworkJob[]
+  accessTokens      AccessToken[]
+
+  @@unique([companyId, host])
+  @@index([companyId])
+  @@map("routers")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  actorUserId String?
+  actorUser   User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action      String
+  entityType  String
+  message     String
+  severity    String   @default("INFO")
+  ipAddress   String?
+  userAgent   String?
+  before      String?
+  after       String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([actorUserId])
+  @@map("audit_logs")
+}
+
+model Plan {
+  id                String   @id @default(cuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  name              String
+  price             Decimal
+  durationValue     Int           @default(30)
+  durationUnit      DurationUnit  @default(DAY)
+  downloadLimitMbps Int
+  uploadLimitMbps   Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  payments          Payment[]
+  subscriptions     InternetSubscription[]
+  accessTokens      AccessToken[]
+
+  @@unique([companyId, name])
+  @@index([companyId, createdAt])
+  @@map("plans")
+}
+
+model Customer {
+  id        String         @id @default(cuid())
+  companyId String
+  company   Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  fullName  String?
+  phone     String?
+  username  String
+  password  String
+  status    CustomerStatus
+  expiresAt DateTime
+  routerId  String?
+  router    Router?        @relation(fields: [routerId], references: [id], onDelete: SetNull)
+  lastPaymentAt DateTime?
+  nextDueAt DateTime?
+  gracePeriodDays Int @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  payments      Payment[]
+  subscriptions InternetSubscription[]
+  networkJobs   NetworkJob[]
+  assignedTokens AccessToken[] @relation("TokenCustomer")
+  devices       CustomerDevice[]
+  deviceChangeRequests DeviceChangeRequest[]
+
+  @@unique([companyId, username])
+  @@index([companyId, createdAt])
+  @@map("customers")
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customerId String?
+  customer   Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  planId     String?
+  plan       Plan?         @relation(fields: [planId], references: [id], onDelete: SetNull)
+  amount     Decimal
+  method     PaymentMethod
+  status     PaymentStatus
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  subscription InternetSubscription?
+
+  createdByUserId String?
+  createdByUser   User?   @relation("PaymentCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  agentCommission AgentCommission?
+
+  accessTokenId String?
+  accessToken   AccessToken?  @relation(fields: [accessTokenId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([customerId, createdAt])
+  @@map("payments")
+}
+
+model InternetSubscription {
+  id         String             @id @default(cuid())
+  companyId  String
+  company    Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customerId String
+  customer   Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  planId     String
+  plan       Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  paymentId  String?            @unique
+  payment    Payment?           @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  routerId   String?
+  router     Router?            @relation(fields: [routerId], references: [id], onDelete: SetNull)
+  startedAt  DateTime
+  expiresAt  DateTime
+  status     SubscriptionStatus
+  networkActivationStatus NetworkActivationStatus @default(PENDING)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([companyId, createdAt])
+  @@index([customerId, createdAt])
+  @@map("internet_subscriptions")
+}
+
+model CompanyRegistrationRequest {
+  id                 String             @id @default(cuid())
+  companyName        String
+  ownerName          String
+  phone              String
+  email              String?
+  country            String
+  city               String
+  address            String?
+  estimatedCustomers Int?
+  message            String?
+  status             RegistrationStatus @default(PENDING)
+  reviewedByUserId   String?
+  reviewedByUser     User?              @relation("ReviewedRequests", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("company_registration_requests")
+}
+
+model AgentCommission {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  agentId    String
+  agent      User     @relation("AgentCommissions", fields: [agentId], references: [id], onDelete: Restrict)
+  paymentId  String   @unique
+  payment    Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  amount     Decimal
+  percentage Decimal
+  status     CommissionStatus @default(PENDING)
+  createdAt  DateTime @default(now())
+  paidAt     DateTime?
+
+  @@index([companyId])
+  @@index([agentId])
+  @@map("agent_commissions")
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  balance   Decimal  @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  transactions WalletTransaction[]
+
+  @@index([companyId])
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id              String   @id @default(cuid())
+  walletId        String
+  wallet          Wallet   @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  amount          Decimal
+  type            TransactionType
+  source          TransactionSource
+  reference       String?
+  status          TransactionStatus @default(PENDING)
+  createdByUserId String?
+  createdByUser   User?    @relation("WalletTransactionCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([walletId])
+  @@index([companyId])
+  @@index([userId])
+  @@index([status])
+  @@map("wallet_transactions")
+}
+
+model WithdrawalRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  amount      Decimal
+  method      String
+  phone       String
+  status      WithdrawalStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@map("withdrawal_requests")
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model Alert {
+  id          String   @id @default(cuid())
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  routerId    String?
+  router      Router?  @relation(fields: [routerId], references: [id], onDelete: Cascade)
+  type        String
+  severity    AlertSeverity @default(INFO)
+  title       String
+  message     String
+  status      AlertStatus @default(OPEN)
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+
+  @@index([companyId, status])
+  @@index([severity, status])
+  @@map("alerts")
+}
+
+enum JobAction {
+  ACTIVATE
+  SUSPEND
+  CREATE_USER
+  TEST_ROUTER
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model NetworkJob {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  routerId    String?
+  router      Router?   @relation(fields: [routerId], references: [id], onDelete: Cascade)
+  action      JobAction
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([companyId, status])
+  @@index([status, createdAt])
+  @@map("network_jobs")
+}
+
+model AccessToken {
+  id                 String       @id @default(cuid())
+  companyId          String
+  company            Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  planId             String
+  plan               Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
+  routerId           String?
+  router             Router?      @relation(fields: [routerId], references: [id], onDelete: SetNull)
+  token              String       @unique
+  status             TokenStatus  @default(UNUSED)
+  generatedByUserId  String
+  generatedByUser    User         @relation("TokenGenerator", fields: [generatedByUserId], references: [id], onDelete: Restrict)
+  assignedCustomerId String?
+  assignedCustomer   Customer?    @relation("TokenCustomer", fields: [assignedCustomerId], references: [id], onDelete: SetNull)
+  price              Decimal
+  currency           String
+  expiresAt          DateTime?
+  activatedAt        DateTime?
+  usedAt             DateTime?
+  boundDeviceId      String?
+  boundMacAddress    String?
+  boundPhone         String?
+  firstActivatedAt   DateTime?
+  lastDeviceCheckAt  DateTime?
+  maxDevices         Int          @default(1)
+  allowDeviceChange  Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  payments           Payment[]
+  devices            CustomerDevice[]
+  deviceChangeRequests DeviceChangeRequest[]
+
+  @@index([companyId, status])
+  @@index([token])
+  @@map("access_tokens")
+}
+
+model CustomerDevice {
+  id            String       @id @default(cuid())
+  companyId     String
+  company       Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customerId    String?
+  customer      Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  accessTokenId String?
+  accessToken   AccessToken? @relation(fields: [accessTokenId], references: [id], onDelete: SetNull)
+  deviceId      String
+  macAddress    String?
+  phone         String?
+  userAgent     String?
+  firstSeenAt   DateTime     @default(now())
+  lastSeenAt    DateTime     @default(now())
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([companyId])
+  @@index([deviceId])
+  @@index([accessTokenId])
+  @@map("customer_devices")
+}
+
+model DeviceChangeRequest {
+  id              String             @id @default(cuid())
+  companyId       String
+  company         Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customerId      String?
+  customer        Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  accessTokenId   String
+  accessToken     AccessToken        @relation(fields: [accessTokenId], references: [id], onDelete: Restrict)
+  oldDeviceId     String?
+  newDeviceId     String
+  reason          String?
+  status          DeviceChangeStatus @default(PENDING)
+  requestedAt     DateTime           @default(now())
+  reviewedByUserId String?
+  reviewedByUser  User?              @relation("DeviceChangeReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+
+  @@index([companyId])
+  @@index([status])
+  @@map("device_change_requests")
+}
