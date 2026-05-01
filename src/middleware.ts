@@ -46,6 +46,7 @@ export function middleware(request: NextRequest) {
 
   // 3. Protéger toutes les routes /dashboard/*
   if (pathname.startsWith('/dashboard')) {
+    console.log(`[Middleware] pathname: ${pathname}, hasCookie: ${!!token}, isValid: ${isValid}, redirectTarget: ${!isValid ? '/login' : 'next'}`);
     if (!isValid) {
       // Si invalide ou absent → redirect /login
       return NextResponse.redirect(new URL('/login', request.url));
@@ -56,6 +57,7 @@ export function middleware(request: NextRequest) {
 
   // 4. Bonus : Si utilisateur connecté et va sur /login → redirect /dashboard
   if (pathname === '/login') {
+    console.log(`[Middleware] pathname: ${pathname}, hasCookie: ${!!token}, isValid: ${isValid}, redirectTarget: ${isValid ? '/dashboard' : 'next'}`);
     if (isValid) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }

@@ -7,7 +7,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    redirect("/api/auth/logout");
   }
 
   let companyName = "";

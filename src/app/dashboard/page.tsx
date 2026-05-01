@@ -15,7 +15,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login");
+    redirect("/api/auth/logout");
   }
   const isCeo = user.role === Role.BIZANET_CEO;
   const auth = { userId: user.id, role: user.role, companyId: user.companyId };
