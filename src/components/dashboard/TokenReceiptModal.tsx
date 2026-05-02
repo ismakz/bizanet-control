@@ -79,7 +79,11 @@ export function TokenReceiptModal({ tokenData, onClose }: TokenReceiptModalProps
           {/* Header */}
           <div className="mb-6 space-y-1">
             <div className="flex justify-center mb-3">
-              <Wifi className="w-10 h-10 text-black" />
+              {tokenData.company.logoUrl ? (
+                <img src={tokenData.company.logoUrl} alt="Logo Entreprise" className="h-16 max-w-[150px] object-contain" />
+              ) : (
+                <Wifi className="w-10 h-10 text-black" />
+              )}
             </div>
             <h2 className="text-2xl font-bold uppercase tracking-widest">{tokenData.company.name}</h2>
             <p className="text-xs text-black/60 uppercase">{tokenData.company.city}</p>

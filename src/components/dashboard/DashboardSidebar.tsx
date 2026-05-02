@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Building2, Server, FileText, CreditCard, Box, LifeBuoy, ShieldCheck, ClipboardList, Wallet, X, KeyRound, Zap, UserCircle, Smartphone } from "lucide-react";
+import { LayoutDashboard, Users, Building2, Server, FileText, CreditCard, Box, LifeBuoy, ShieldCheck, ClipboardList, Wallet, X, KeyRound, Zap, UserCircle, Smartphone, Settings } from "lucide-react";
 
 const roleNavMap: Record<string, any[]> = {
   BIZANET_CEO: [
@@ -35,6 +35,7 @@ const roleNavMap: Record<string, any[]> = {
     { title: "Abonnements", href: "/dashboard/subscriptions", icon: FileText },
     { title: "Routeur", href: "/dashboard/router-status", icon: Server },
     { title: "Demandes Appareils", href: "/dashboard/device-requests", icon: Smartphone },
+    { title: "Paramètres Entreprise", href: "/dashboard/company-settings", icon: Settings },
     { title: "Support", href: "/dashboard/support", icon: LifeBuoy },
   ],
   COMPANY_AGENT: [

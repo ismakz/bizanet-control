@@ -15,7 +15,7 @@ type SessionPayload = {
   mustChangePassword?: boolean;
 };
 
-type AuthUser = Pick<User, "id" | "fullName" | "phone" | "email" | "role" | "companyId" | "mustChangePassword">;
+type AuthUser = Pick<User, "id" | "fullName" | "phone" | "email" | "role" | "companyId" | "mustChangePassword" | "profileImageUrl">;
 
 function getJwtSecret(): string {
   return process.env.JWT_SECRET ?? "dev-jwt-secret-change-me";
@@ -54,6 +54,7 @@ async function getUserById(userId: string): Promise<AuthUser | null> {
       role: true,
       companyId: true,
       mustChangePassword: true,
+      profileImageUrl: true,
     },
   });
 }
@@ -103,6 +104,7 @@ export async function login(phone: string, password: string): Promise<{ token: s
       companyId: true,
       passwordHash: true,
       mustChangePassword: true,
+      profileImageUrl: true,
     },
   });
   
@@ -128,6 +130,7 @@ export async function login(phone: string, password: string): Promise<{ token: s
     role: user.role,
     companyId: user.companyId,
     mustChangePassword: user.mustChangePassword,
+    profileImageUrl: user.profileImageUrl,
   };
   const token = signToken({
     sub: safeUser.id,

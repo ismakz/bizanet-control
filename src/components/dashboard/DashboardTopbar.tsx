@@ -2,7 +2,7 @@
 
 import { LogoutButton } from "@/components/LogoutButton";
 import Link from "next/link";
-import { KeyRound, Menu } from "lucide-react";
+import { KeyRound, Menu, UserCircle } from "lucide-react";
 
 export function DashboardTopbar({ userName, role, onMenuClick }: { userName: string, role: string, onMenuClick?: () => void }) {
   return (
@@ -28,12 +28,12 @@ export function DashboardTopbar({ userName, role, onMenuClick }: { userName: str
         <div className="h-8 w-px bg-white/10 mx-2" />
         
         <Link 
-          href="/change-password" 
+          href="/dashboard/profile" 
           className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-          title="Changer mot de passe"
+          title="Mon Profil"
         >
-          <KeyRound className="h-4 w-4" />
-          <span className="hidden md:inline">Mot de passe</span>
+          <UserCircle className="h-4 w-4" />
+          <span className="hidden md:inline">Profil</span>
         </Link>
         
         <LogoutButton />
