@@ -10,8 +10,11 @@ import { encrypt } from "@/lib/crypto";
 const createRouterSchema = z.object({
   name: z.string().min(1).max(120),
   host: z.string().min(3).max(120),
+  apiPort: z.coerce.number().int().min(1).max(65535).default(8728),
   username: z.string().min(1).max(120),
   password: z.string().min(1).max(200),
+  location: z.string().max(200).optional().nullable(),
+  networkMode: z.enum(["mock", "live"]).optional(),
   status: z.nativeEnum(RouterStatus).optional(),
   companyId: z.string().optional(),
 });
@@ -29,8 +32,13 @@ export async function GET(req: Request) {
         companyId: true,
         name: true,
         host: true,
+        apiPort: true,
         username: true,
+        location: true,
+        networkMode: true,
         status: true,
+        lastSeenAt: true,
+        lastError: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -55,14 +63,19 @@ export async function POST(req: Request) {
     const body = await req.json();
     const parsed = createRouterSchema.parse(body);
     const companyId = resolveWriteCompanyId(auth, parsed.companyId);
+    const canEditNetworkMode =
+      auth.role === Role.BIZANET_CEO || process.env.ALLOW_COMPANY_ADMIN_ROUTER_MODE_EDIT === "true";
 
     const router = await prisma.router.create({
       data: {
         companyId,
         name: parsed.name,
         host: parsed.host,
+        apiPort: parsed.apiPort,
         username: parsed.username,
         encryptedPassword: encrypt(parsed.password),
+        location: parsed.location || null,
+        networkMode: canEditNetworkMode ? parsed.networkMode ?? null : null,
         status: parsed.status ?? RouterStatus.UNKNOWN,
       },
       select: {
@@ -70,8 +83,13 @@ export async function POST(req: Request) {
         companyId: true,
         name: true,
         host: true,
+        apiPort: true,
         username: true,
+        location: true,
+        networkMode: true,
         status: true,
+        lastSeenAt: true,
+        lastError: true,
         createdAt: true,
         updatedAt: true,
       },

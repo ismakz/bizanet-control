@@ -215,9 +215,13 @@ model Router {
   company           Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   name              String
   host              String
+  apiPort           Int      @default(8728)
   username          String
   encryptedPassword String
+  location          String?
+  networkMode       String?
   status            RouterStatus @default(UNKNOWN)
+  lastSeenAt        DateTime?
   lastError         String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

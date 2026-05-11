@@ -4,7 +4,11 @@ import { decrypt } from "@/lib/crypto";
 import { Router } from "@prisma/client";
 import { createRouterOfflineAlert } from "@/lib/alerts";
 
-const isMockMode = process.env.BIZANET_NETWORK_MODE === "mock";
+function isRouterInMockMode(router?: Pick<Router, "networkMode"> | null): boolean {
+  if (router?.networkMode === "mock") return true;
+  if (router?.networkMode === "live") return false;
+  return process.env.BIZANET_NETWORK_MODE === "mock";
+}
 
 class MockRouterOSClient {
   async connect() { return; }
@@ -23,7 +27,7 @@ class MockRouterOSClient {
 }
 
 export async function connectRouter(router: Router) {
-  if (isMockMode) {
+  if (isRouterInMockMode(router)) {
     // Simulate network delay
     await new Promise(res => setTimeout(res, 500));
     return new MockRouterOSClient();
@@ -31,6 +35,7 @@ export async function connectRouter(router: Router) {
 
   const client = new RouterOSClient({
     host: router.host,
+    port: router.apiPort,
     user: router.username,
     password: decrypt(router.encryptedPassword),
     keepalive: true,
@@ -70,39 +75,30 @@ export async function testRouterConnection(routerId: string) {
   try {
     const client = await connectRouter(router);
     await client.close();
+    const now = new Date();
 
-    await prisma.router.update({
+    const updated = await prisma.router.update({
       where: { id: routerId },
-      data: { status: "ONLINE", lastError: null },
+      data: { status: "ONLINE", lastError: null, lastSeenAt: now },
     });
-    
-    await prisma.auditLog.create({
-      data: {
-        companyId: router.companyId,
-        action: "ROUTER_TEST_SUCCESS",
-        entityType: "Router",
-        message: `Connexion réussie au routeur ${router.name}`,
-      }
-    });
-    return true;
+    return {
+      success: true,
+      router: updated,
+      message: "MikroTik connecté avec succès.",
+    };
   } catch (error: any) {
-    await prisma.router.update({
+    const updated = await prisma.router.update({
       where: { id: routerId },
       data: { status: "OFFLINE", lastError: error.message },
     });
-    
-    await prisma.auditLog.create({
-      data: {
-        companyId: router.companyId,
-        action: "ROUTER_TEST_FAILED",
-        entityType: "Router",
-        message: `Échec de connexion au routeur ${router.name}: ${error.message}`,
-      }
-    });
 
     await createRouterOfflineAlert(router, error.message);
-    
-    return false;
+
+    return {
+      success: false,
+      router: updated,
+      message: "Impossible de joindre MikroTik. Vérifiez IP, port, username, password et accès API.",
+    };
   }
 }
 
@@ -296,7 +292,7 @@ export async function getActiveUsers(routerId: string) {
 
   const client = await connectRouter(router);
   try {
-    if (isMockMode) {
+    if (isRouterInMockMode(router)) {
       // Mock data
       return [
         { "user": "test1", "address": "192.168.88.10", "uptime": "1d2h", "bytes-in": "12000", "bytes-out": "45000" },
@@ -460,7 +456,7 @@ export async function getPppoeActiveUsers(routerId: string) {
 
   const client = await connectRouter(router);
   try {
-    if (isMockMode) return [];
+    if (isRouterInMockMode(router)) return [];
     const activeMenu = (client as any).menu("/ppp active");
     return await activeMenu.get();
   } catch (error: any) {
@@ -479,7 +475,7 @@ export async function getDhcpLeases(routerId: string) {
 
   const client = await connectRouter(router);
   try {
-    if (isMockMode) {
+    if (isRouterInMockMode(router)) {
       return [
         { "mac-address": "AA:BB:CC:DD:EE:FF", "address": "192.168.1.50", "status": "bound", "host-name": "Desktop-PC" }
       ];

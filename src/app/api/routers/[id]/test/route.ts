@@ -4,6 +4,7 @@ import { getAuthContextFromRequest } from "@/lib/auth";
 import { assertCompanyAccess, requireOneOfRoles } from "@/lib/permissions";
 import { Role } from "@prisma/client";
 import { testRouterConnection } from "@/lib/mikrotik";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -19,15 +20,27 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
     assertCompanyAccess(auth, router.companyId);
 
-    const isConnected = await testRouterConnection(router.id);
-    
-    const updatedRouter = await prisma.router.findUnique({ where: { id: router.id } });
+    const result = await testRouterConnection(router.id);
 
-    if (isConnected) {
-      return NextResponse.json({ success: true, router: updatedRouter });
-    } else {
-      return NextResponse.json({ success: false, error: updatedRouter?.lastError || "Échec de connexion", router: updatedRouter }, { status: 400 });
+    await writeAuditLog({
+      auth,
+      companyId: router.companyId,
+      action: "ROUTER_TESTED",
+      entityType: "Router",
+      message: `Router test ${result.success ? "success" : "failed"}: ${router.name}`,
+    });
+
+    if (result.success) {
+      return NextResponse.json({ success: true, message: result.message, router: result.router });
     }
+    return NextResponse.json(
+      {
+        success: false,
+        error: result.message,
+        router: result.router,
+      },
+      { status: 400 },
+    );
   } catch (e: any) {
     if (e.message === "UNAUTHENTICATED") return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     if (e.message.startsWith("FORBIDDEN")) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
