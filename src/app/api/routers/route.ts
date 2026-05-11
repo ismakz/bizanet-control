@@ -7,6 +7,15 @@ import { getTenantWhere, resolveWriteCompanyId } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { encrypt } from "@/lib/crypto";
 
+function isMissingColumnError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2022"
+  );
+}
+
 const createRouterSchema = z.object({
   name: z.string().min(1).max(120),
   host: z.string().min(3).max(120),
@@ -24,25 +33,52 @@ export async function GET(req: Request) {
     const auth = await getAuthContextFromRequest(req);
     const where = auth.role === Role.BIZANET_CEO ? {} : getTenantWhere(auth);
 
-    const routers = await prisma.router.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        companyId: true,
-        name: true,
-        host: true,
-        apiPort: true,
-        username: true,
-        location: true,
-        networkMode: true,
-        status: true,
-        lastSeenAt: true,
-        lastError: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    let routers: Array<Record<string, unknown>> = [];
+    try {
+      routers = await prisma.router.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          companyId: true,
+          name: true,
+          host: true,
+          apiPort: true,
+          username: true,
+          location: true,
+          networkMode: true,
+          status: true,
+          lastSeenAt: true,
+          lastError: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      if (!isMissingColumnError(error)) throw error;
+      const legacyRouters = await prisma.router.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          companyId: true,
+          name: true,
+          host: true,
+          username: true,
+          status: true,
+          lastError: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      routers = legacyRouters.map((router) => ({
+        ...router,
+        apiPort: 8728,
+        location: null,
+        networkMode: null,
+        lastSeenAt: null,
+      }));
+    }
 
     return NextResponse.json({ routers });
   } catch (e: unknown) {
@@ -66,34 +102,67 @@ export async function POST(req: Request) {
     const canEditNetworkMode =
       auth.role === Role.BIZANET_CEO || process.env.ALLOW_COMPANY_ADMIN_ROUTER_MODE_EDIT === "true";
 
-    const router = await prisma.router.create({
-      data: {
-        companyId,
-        name: parsed.name,
-        host: parsed.host,
-        apiPort: parsed.apiPort,
-        username: parsed.username,
-        encryptedPassword: encrypt(parsed.password),
-        location: parsed.location || null,
-        networkMode: canEditNetworkMode ? parsed.networkMode ?? null : null,
-        status: parsed.status ?? RouterStatus.UNKNOWN,
-      },
-      select: {
-        id: true,
-        companyId: true,
-        name: true,
-        host: true,
-        apiPort: true,
-        username: true,
-        location: true,
-        networkMode: true,
-        status: true,
-        lastSeenAt: true,
-        lastError: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    let router: Record<string, unknown>;
+    try {
+      router = await prisma.router.create({
+        data: {
+          companyId,
+          name: parsed.name,
+          host: parsed.host,
+          apiPort: parsed.apiPort,
+          username: parsed.username,
+          encryptedPassword: encrypt(parsed.password),
+          location: parsed.location || null,
+          networkMode: canEditNetworkMode ? parsed.networkMode ?? null : null,
+          status: parsed.status ?? RouterStatus.UNKNOWN,
+        },
+        select: {
+          id: true,
+          companyId: true,
+          name: true,
+          host: true,
+          apiPort: true,
+          username: true,
+          location: true,
+          networkMode: true,
+          status: true,
+          lastSeenAt: true,
+          lastError: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      if (!isMissingColumnError(error)) throw error;
+      const legacyRouter = await prisma.router.create({
+        data: {
+          companyId,
+          name: parsed.name,
+          host: parsed.host,
+          username: parsed.username,
+          encryptedPassword: encrypt(parsed.password),
+          status: parsed.status ?? RouterStatus.UNKNOWN,
+        },
+        select: {
+          id: true,
+          companyId: true,
+          name: true,
+          host: true,
+          username: true,
+          status: true,
+          lastError: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      router = {
+        ...legacyRouter,
+        apiPort: 8728,
+        location: null,
+        networkMode: null,
+        lastSeenAt: null,
+      };
+    }
 
     await writeAuditLog({
       auth,

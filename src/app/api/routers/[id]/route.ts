@@ -7,6 +7,15 @@ import { assertCompanyAccess } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
 import { encrypt } from "@/lib/crypto";
 
+function isMissingColumnError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2022"
+  );
+}
+
 const patchSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   host: z.string().min(3).max(120).optional(),
@@ -38,34 +47,67 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const canEditNetworkMode =
       auth.role === Role.BIZANET_CEO || process.env.ALLOW_COMPANY_ADMIN_ROUTER_MODE_EDIT === "true";
 
-    const router = await prisma.router.update({
-      where: { id: params.id },
-      data: {
-        name: parsed.name,
-        host: parsed.host,
-        apiPort: parsed.apiPort,
-        username: parsed.username,
-        location: parsed.location,
-        networkMode: canEditNetworkMode ? parsed.networkMode : undefined,
-        status: parsed.status,
-        encryptedPassword: passwordToApply ? encrypt(passwordToApply) : undefined,
-      },
-      select: {
-        id: true,
-        companyId: true,
-        name: true,
-        host: true,
-        apiPort: true,
-        username: true,
-        location: true,
-        networkMode: true,
-        status: true,
-        lastSeenAt: true,
-        lastError: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    let router: Record<string, unknown>;
+    try {
+      router = await prisma.router.update({
+        where: { id: params.id },
+        data: {
+          name: parsed.name,
+          host: parsed.host,
+          apiPort: parsed.apiPort,
+          username: parsed.username,
+          location: parsed.location,
+          networkMode: canEditNetworkMode ? parsed.networkMode : undefined,
+          status: parsed.status,
+          encryptedPassword: passwordToApply ? encrypt(passwordToApply) : undefined,
+        },
+        select: {
+          id: true,
+          companyId: true,
+          name: true,
+          host: true,
+          apiPort: true,
+          username: true,
+          location: true,
+          networkMode: true,
+          status: true,
+          lastSeenAt: true,
+          lastError: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      if (!isMissingColumnError(error)) throw error;
+      const legacyRouter = await prisma.router.update({
+        where: { id: params.id },
+        data: {
+          name: parsed.name,
+          host: parsed.host,
+          username: parsed.username,
+          status: parsed.status,
+          encryptedPassword: passwordToApply ? encrypt(passwordToApply) : undefined,
+        },
+        select: {
+          id: true,
+          companyId: true,
+          name: true,
+          host: true,
+          username: true,
+          status: true,
+          lastError: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      router = {
+        ...legacyRouter,
+        apiPort: 8728,
+        location: null,
+        networkMode: null,
+        lastSeenAt: null,
+      };
+    }
 
     await writeAuditLog({
       auth,

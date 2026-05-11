@@ -4,7 +4,12 @@ import { decrypt } from "@/lib/crypto";
 import { Router } from "@prisma/client";
 import { createRouterOfflineAlert } from "@/lib/alerts";
 
-function isRouterInMockMode(router?: Pick<Router, "networkMode"> | null): boolean {
+type RouterConnectionInput = Pick<Router, "host" | "username" | "encryptedPassword"> & {
+  apiPort?: number | null;
+  networkMode?: string | null;
+};
+
+function isRouterInMockMode(router?: { networkMode?: string | null } | null): boolean {
   if (router?.networkMode === "mock") return true;
   if (router?.networkMode === "live") return false;
   return process.env.BIZANET_NETWORK_MODE === "mock";
@@ -26,7 +31,7 @@ class MockRouterOSClient {
   }
 }
 
-export async function connectRouter(router: Router) {
+export async function connectRouter(router: RouterConnectionInput) {
   if (isRouterInMockMode(router)) {
     // Simulate network delay
     await new Promise(res => setTimeout(res, 500));
@@ -35,7 +40,7 @@ export async function connectRouter(router: Router) {
 
   const client = new RouterOSClient({
     host: router.host,
-    port: router.apiPort,
+    port: router.apiPort ?? 8728,
     user: router.username,
     password: decrypt(router.encryptedPassword),
     keepalive: true,
@@ -69,7 +74,17 @@ async function handleMikroTikFailure(
 }
 
 export async function testRouterConnection(routerId: string) {
-  const router = await prisma.router.findUnique({ where: { id: routerId } });
+  const router = await prisma.router.findUnique({
+    where: { id: routerId },
+    select: {
+      id: true,
+      companyId: true,
+      name: true,
+      host: true,
+      username: true,
+      encryptedPassword: true,
+    },
+  });
   if (!router) throw new Error("Router introuvable");
 
   try {
@@ -80,6 +95,17 @@ export async function testRouterConnection(routerId: string) {
     const updated = await prisma.router.update({
       where: { id: routerId },
       data: { status: "ONLINE", lastError: null, lastSeenAt: now },
+      select: {
+        id: true,
+        companyId: true,
+        name: true,
+        host: true,
+        username: true,
+        status: true,
+        lastError: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
     return {
       success: true,
@@ -90,6 +116,17 @@ export async function testRouterConnection(routerId: string) {
     const updated = await prisma.router.update({
       where: { id: routerId },
       data: { status: "OFFLINE", lastError: error.message },
+      select: {
+        id: true,
+        companyId: true,
+        name: true,
+        host: true,
+        username: true,
+        status: true,
+        lastError: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     await createRouterOfflineAlert(router, error.message);
@@ -287,12 +324,22 @@ export async function deleteUser(customerId: string) {
 }
 
 export async function getActiveUsers(routerId: string) {
-  const router = await prisma.router.findUnique({ where: { id: routerId } });
+  const router = await prisma.router.findUnique({
+    where: { id: routerId },
+    select: {
+      id: true,
+      companyId: true,
+      name: true,
+      host: true,
+      username: true,
+      encryptedPassword: true,
+    },
+  });
   if (!router) throw new Error("Router introuvable");
 
   const client = await connectRouter(router);
   try {
-    if (isRouterInMockMode(router)) {
+    if (isRouterInMockMode(router as any)) {
       // Mock data
       return [
         { "user": "test1", "address": "192.168.88.10", "uptime": "1d2h", "bytes-in": "12000", "bytes-out": "45000" },
@@ -451,12 +498,22 @@ export async function deletePppoeSecret(customerId: string) {
 }
 
 export async function getPppoeActiveUsers(routerId: string) {
-  const router = await prisma.router.findUnique({ where: { id: routerId } });
+  const router = await prisma.router.findUnique({
+    where: { id: routerId },
+    select: {
+      id: true,
+      companyId: true,
+      name: true,
+      host: true,
+      username: true,
+      encryptedPassword: true,
+    },
+  });
   if (!router) throw new Error("Router introuvable");
 
   const client = await connectRouter(router);
   try {
-    if (isRouterInMockMode(router)) return [];
+    if (isRouterInMockMode(router as any)) return [];
     const activeMenu = (client as any).menu("/ppp active");
     return await activeMenu.get();
   } catch (error: any) {
@@ -470,12 +527,22 @@ export async function getPppoeActiveUsers(routerId: string) {
 // --- Wired Ethernet Functions ---
 
 export async function getDhcpLeases(routerId: string) {
-  const router = await prisma.router.findUnique({ where: { id: routerId } });
+  const router = await prisma.router.findUnique({
+    where: { id: routerId },
+    select: {
+      id: true,
+      companyId: true,
+      name: true,
+      host: true,
+      username: true,
+      encryptedPassword: true,
+    },
+  });
   if (!router) throw new Error("Router introuvable");
 
   const client = await connectRouter(router);
   try {
-    if (isRouterInMockMode(router)) {
+    if (isRouterInMockMode(router as any)) {
       return [
         { "mac-address": "AA:BB:CC:DD:EE:FF", "address": "192.168.1.50", "status": "bound", "host-name": "Desktop-PC" }
       ];
@@ -491,7 +558,17 @@ export async function getDhcpLeases(routerId: string) {
 }
 
 export async function createDhcpMacBinding(routerId: string, macAddress: string, ipAddress: string) {
-  const router = await prisma.router.findUnique({ where: { id: routerId } });
+  const router = await prisma.router.findUnique({
+    where: { id: routerId },
+    select: {
+      id: true,
+      companyId: true,
+      name: true,
+      host: true,
+      username: true,
+      encryptedPassword: true,
+    },
+  });
   if (!router) throw new Error("Router introuvable");
 
   const client = await connectRouter(router);

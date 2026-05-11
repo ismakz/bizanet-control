@@ -12,7 +12,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     requireOneOfRoles(auth, [Role.BIZANET_CEO, Role.COMPANY_ADMIN]);
 
     const router = await prisma.router.findUnique({
-      where: { id: params.id }
+      where: { id: params.id },
+      select: { id: true, companyId: true, name: true },
     });
 
     if (!router) {
