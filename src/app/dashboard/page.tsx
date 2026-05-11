@@ -12,6 +12,15 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
+function isMissingColumnError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2022"
+  );
+}
+
 function DashboardEmptyState({
   title,
   description,
@@ -99,13 +108,32 @@ export default async function DashboardPage() {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    let company: Awaited<ReturnType<typeof prisma.company.findUnique>> = null;
+    let company: {
+      id: string;
+      name: string;
+      city: string;
+      country: string;
+      currency: string;
+      saasPlan: string | null;
+      saasExpiresAt: Date | null;
+    } | null = null;
     let wallet: Awaited<ReturnType<typeof prisma.wallet.findUnique>> = null;
     let tokensToday = 0;
     let tokensTotal = 0;
     try {
       [company, wallet, tokensToday, tokensTotal] = await Promise.all([
-        prisma.company.findUnique({ where: { id: user.companyId } }),
+        prisma.company.findUnique({
+          where: { id: user.companyId },
+          select: {
+            id: true,
+            name: true,
+            city: true,
+            country: true,
+            currency: true,
+            saasPlan: true,
+            saasExpiresAt: true,
+          },
+        }),
         prisma.wallet.findUnique({ where: { userId: user.id } }),
         prisma.accessToken.count({ where: { generatedByUserId: user.id, createdAt: { gte: startOfDay } } }),
         prisma.accessToken.count({ where: { generatedByUserId: user.id } }),
@@ -176,21 +204,35 @@ export default async function DashboardPage() {
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  let company: Awaited<ReturnType<typeof prisma.company.findUnique>> = null;
+  let company: {
+    id: string;
+    name: string;
+    city: string;
+    country: string;
+    currency: string;
+    saasPlan: string | null;
+    saasExpiresAt: Date | null;
+  } | null = null;
   let customersActive = 0;
   let customersExpired = 0;
   let customersSuspended = 0;
   let plansTotal = 0;
   let paymentsPending = 0;
   let failedActivations = 0;
-  let recentCustomers: Awaited<ReturnType<typeof prisma.customer.findMany>> = [];
+  let recentCustomers: Array<{
+    id: string;
+    fullName: string | null;
+    status: CustomerStatus;
+    expiresAt: Date;
+    createdAt: Date;
+  }> = [];
   let recentPayments: Array<{
     id: string;
     amount: { toString(): string };
     status: string;
     customer?: { fullName: string | null } | null;
   }> = [];
-  let routers: Awaited<ReturnType<typeof prisma.router.findMany>> = [];
+  let routers: Array<{ id: string; status: string; name: string }> = [];
   let tokensUnused = 0;
   let dailyPaymentsAmount = 0;
   let monthlyPaymentsAmount = 0;
@@ -216,7 +258,18 @@ export default async function DashboardPage() {
       dailyTopups,
       monthlyTopups,
     ] = await Promise.all([
-      prisma.company.findUnique({ where: { id: user.companyId } }),
+      prisma.company.findUnique({
+        where: { id: user.companyId },
+        select: {
+          id: true,
+          name: true,
+          city: true,
+          country: true,
+          currency: true,
+          saasPlan: true,
+          saasExpiresAt: true,
+        },
+      }),
       prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.ACTIVE } }),
       prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.EXPIRED } }),
       prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.SUSPENDED } }),
@@ -247,14 +300,30 @@ export default async function DashboardPage() {
         where: tenantWhere,
         orderBy: { createdAt: "desc" },
         take: 5,
+        select: {
+          id: true,
+          fullName: true,
+          status: true,
+          expiresAt: true,
+          createdAt: true,
+        },
       }),
       prisma.payment.findMany({
         where: tenantWhere,
         orderBy: { createdAt: "desc" },
         take: 5,
-        include: { customer: { select: { fullName: true } } },
+        select: {
+          id: true,
+          amount: true,
+          status: true,
+          customer: { select: { fullName: true } },
+          createdAt: true,
+        },
       }),
-      prisma.router.findMany({ where: tenantWhere }),
+      prisma.router.findMany({
+        where: tenantWhere,
+        select: { id: true, status: true, name: true },
+      }),
       prisma.accessToken.count({ where: { ...tenantWhere, createdAt: { gte: startOfDay } } }),
       prisma.accessToken.count({ where: { ...tenantWhere, status: "UNUSED" } }),
       prisma.walletTransaction.aggregate({
@@ -276,19 +345,105 @@ export default async function DashboardPage() {
     failedActivations = loadedFailedActivations;
     recentCustomers = loadedRecentCustomers;
     recentPayments = loadedRecentPayments;
-    routers = loadedRouters;
+    routers = loadedRouters as typeof routers;
     tokensUnused = loadedTokensUnused;
     dailyPaymentsAmount = Number(dailyPayments?._sum?.amount ?? 0);
     monthlyPaymentsAmount = Number(monthlyPayments?._sum?.amount ?? 0);
     dailyTopupsAmount = Number(dailyTopups?._sum?.amount ?? 0);
     monthlyTopupsAmount = Number(monthlyTopups?._sum?.amount ?? 0);
-  } catch {
-    return (
-      <DashboardEmptyState
-        title="Dashboard indisponible"
-        description="Une erreur est survenue pendant le chargement des statistiques. Réessayez, puis contactez le support si le problème persiste."
-      />
-    );
+  } catch (error) {
+    // Legacy fallback for partially migrated production schemas.
+    if (!isMissingColumnError(error)) {
+      return (
+        <DashboardEmptyState
+          title="Dashboard indisponible"
+          description="Une erreur est survenue pendant le chargement des statistiques. Réessayez, puis contactez le support si le problème persiste."
+        />
+      );
+    }
+
+    try {
+      const [
+        loadedCompany,
+        loadedCustomersActive,
+        loadedCustomersExpired,
+        loadedCustomersSuspended,
+        loadedPlansTotal,
+        loadedPaymentsPending,
+        loadedRecentCustomers,
+        loadedRecentPayments,
+        loadedRouters,
+      ] = await Promise.all([
+        prisma.company.findUnique({
+          where: { id: user.companyId },
+          select: {
+            id: true,
+            name: true,
+            city: true,
+            country: true,
+            currency: true,
+            saasPlan: true,
+            saasExpiresAt: true,
+          },
+        }),
+        prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.ACTIVE } }),
+        prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.EXPIRED } }),
+        prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.SUSPENDED } }),
+        prisma.plan.count({ where: tenantWhere }),
+        prisma.payment.count({ where: { ...tenantWhere, status: "PENDING" } }),
+        prisma.customer.findMany({
+          where: tenantWhere,
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            fullName: true,
+            status: true,
+            expiresAt: true,
+            createdAt: true,
+          },
+        }),
+        prisma.payment.findMany({
+          where: tenantWhere,
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            customer: { select: { fullName: true } },
+            createdAt: true,
+          },
+        }),
+        prisma.router.findMany({
+          where: tenantWhere,
+          select: { id: true, status: true, name: true },
+        }),
+      ]);
+
+      company = loadedCompany;
+      customersActive = loadedCustomersActive;
+      customersExpired = loadedCustomersExpired;
+      customersSuspended = loadedCustomersSuspended;
+      plansTotal = loadedPlansTotal;
+      paymentsPending = loadedPaymentsPending;
+      failedActivations = 0;
+      recentCustomers = loadedRecentCustomers;
+      recentPayments = loadedRecentPayments;
+      routers = loadedRouters as typeof routers;
+      tokensUnused = 0;
+      dailyPaymentsAmount = 0;
+      monthlyPaymentsAmount = 0;
+      dailyTopupsAmount = 0;
+      monthlyTopupsAmount = 0;
+    } catch {
+      return (
+        <DashboardEmptyState
+          title="Dashboard indisponible"
+          description="Une erreur est survenue pendant le chargement des statistiques. Réessayez, puis contactez le support si le problème persiste."
+        />
+      );
+    }
   }
 
   if (!company) {
