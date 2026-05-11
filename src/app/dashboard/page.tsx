@@ -12,6 +12,34 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
+function DashboardEmptyState({
+  title,
+  description,
+  ctaHref,
+  ctaLabel,
+}: {
+  title: string;
+  description: string;
+  ctaHref?: string;
+  ctaLabel?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0B131E]/80 p-8 text-center">
+      <SearchX className="mx-auto mb-3 h-10 w-10 text-white/30" />
+      <h2 className="text-lg font-semibold text-white">{title}</h2>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-white/60">{description}</p>
+      {ctaHref && ctaLabel ? (
+        <Link
+          href={ctaHref}
+          className="mt-4 inline-flex rounded-lg border border-cyan/30 bg-cyan/10 px-4 py-2 text-sm font-medium text-cyan hover:bg-cyan/20"
+        >
+          {ctaLabel}
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) {
@@ -19,7 +47,6 @@ export default async function DashboardPage() {
   }
   const isCeo = user.role === Role.BIZANET_CEO;
   const auth = { userId: user.id, role: user.role, companyId: user.companyId };
-  const tenantWhere = getTenantWhere(auth);
 
   if (isCeo) {
     const [companies, routers, usersCount, subscriptions] = await Promise.all([
@@ -60,19 +87,46 @@ export default async function DashboardPage() {
 
   // --- COMPANY AGENT DASHBOARD ---
   if (user.role === Role.COMPANY_AGENT) {
-    if (!user.companyId) return <div>Company ID missing</div>;
+    if (!user.companyId) {
+      return (
+        <DashboardEmptyState
+          title="Compte revendeur incomplet"
+          description="Votre compte n'est pas encore rattaché à une company. Contactez votre administrateur BizaNet."
+        />
+      );
+    }
 
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const [company, wallet, tokensToday, tokensTotal] = await Promise.all([
-      prisma.company.findUnique({ where: { id: user.companyId } }),
-      prisma.wallet.findUnique({ where: { userId: user.id } }),
-      prisma.accessToken.count({ where: { generatedByUserId: user.id, createdAt: { gte: startOfDay } } }),
-      prisma.accessToken.count({ where: { generatedByUserId: user.id } }),
-    ]);
+    let company: Awaited<ReturnType<typeof prisma.company.findUnique>> = null;
+    let wallet: Awaited<ReturnType<typeof prisma.wallet.findUnique>> = null;
+    let tokensToday = 0;
+    let tokensTotal = 0;
+    try {
+      [company, wallet, tokensToday, tokensTotal] = await Promise.all([
+        prisma.company.findUnique({ where: { id: user.companyId } }),
+        prisma.wallet.findUnique({ where: { userId: user.id } }),
+        prisma.accessToken.count({ where: { generatedByUserId: user.id, createdAt: { gte: startOfDay } } }),
+        prisma.accessToken.count({ where: { generatedByUserId: user.id } }),
+      ]);
+    } catch {
+      return (
+        <DashboardEmptyState
+          title="Impossible de charger le dashboard"
+          description="Une erreur temporaire est survenue pendant le chargement. Réessayez dans quelques instants."
+        />
+      );
+    }
 
-    if (!company) return <div>Company not found</div>;
+    if (!company) {
+      return (
+        <DashboardEmptyState
+          title="Company introuvable"
+          description="Votre compte revendeur ne pointe vers aucune company active."
+        />
+      );
+    }
     const currency = company.currency;
 
     return (
@@ -107,101 +161,159 @@ export default async function DashboardPage() {
   }
 
   // --- COMPANY ADMIN DASHBOARD ---
-  if (!user.companyId) return <div>Company ID missing</div>;
+  if (!user.companyId) {
+    return (
+      <DashboardEmptyState
+        title="Compte administrateur incomplet"
+        description="Votre compte COMPANY_ADMIN n'est pas encore rattaché à une company. Contactez le support BizaNet."
+      />
+    );
+  }
+
+  const tenantWhere = getTenantWhere(auth);
 
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const [
-    company,
-    customersActive,
-    customersExpired,
-    customersSuspended,
-    plansTotal,
-    paymentsPending,
-    dailyPayments,
-    monthlyPayments,
-    failedActivations,
-    recentCustomers,
-    recentPayments,
-    routers,
-    tokensGeneratedToday,
-    tokensUnused,
-    dailyTopups,
-    monthlyTopups
-  ] = await Promise.all([
-    prisma.company.findUnique({ where: { id: user.companyId } }),
-    prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.ACTIVE } }),
-    prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.EXPIRED } }),
-    prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.SUSPENDED } }),
-    prisma.plan.count({ where: tenantWhere }),
-    prisma.payment.count({ where: { ...tenantWhere, status: "PENDING" } }),
-    prisma.payment.aggregate({
-      where: { 
-        ...tenantWhere, 
-        status: "APPROVED", 
-        createdAt: { gte: startOfDay },
-        OR: [
-          { createdByUserId: null },
-          { createdByUser: { role: { not: Role.COMPANY_AGENT } } }
-        ]
-      },
-      _sum: { amount: true }
-    }),
-    prisma.payment.aggregate({
-      where: { 
-        ...tenantWhere, 
-        status: "APPROVED", 
-        createdAt: { gte: startOfMonth },
-        OR: [
-          { createdByUserId: null },
-          { createdByUser: { role: { not: Role.COMPANY_AGENT } } }
-        ]
-      },
-      _sum: { amount: true }
-    }),
-    prisma.internetSubscription.count({
-      where: { ...tenantWhere, networkActivationStatus: "FAILED" }
-    }),
-    prisma.customer.findMany({
-      where: tenantWhere,
-      orderBy: { createdAt: "desc" },
-      take: 5
-    }),
-    prisma.payment.findMany({
-      where: tenantWhere,
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: { customer: { select: { fullName: true } } }
-    }),
-    prisma.router.findMany({ where: tenantWhere }),
-    prisma.accessToken.count({ where: { ...tenantWhere, createdAt: { gte: startOfDay } } }),
-    prisma.accessToken.count({ where: { ...tenantWhere, status: "UNUSED" } }),
-    prisma.walletTransaction.aggregate({
-      where: { companyId: user.companyId, source: "ADMIN_TOPUP", type: "CREDIT", createdAt: { gte: startOfDay } },
-      _sum: { amount: true }
-    }),
-    prisma.walletTransaction.aggregate({
-      where: { companyId: user.companyId, source: "ADMIN_TOPUP", type: "CREDIT", createdAt: { gte: startOfMonth } },
-      _sum: { amount: true }
-    })
-  ]);
+  let company: Awaited<ReturnType<typeof prisma.company.findUnique>> = null;
+  let customersActive = 0;
+  let customersExpired = 0;
+  let customersSuspended = 0;
+  let plansTotal = 0;
+  let paymentsPending = 0;
+  let failedActivations = 0;
+  let recentCustomers: Awaited<ReturnType<typeof prisma.customer.findMany>> = [];
+  let recentPayments: Array<{
+    id: string;
+    amount: { toString(): string };
+    status: string;
+    customer?: { fullName: string | null } | null;
+  }> = [];
+  let routers: Awaited<ReturnType<typeof prisma.router.findMany>> = [];
+  let tokensUnused = 0;
+  let dailyPaymentsAmount = 0;
+  let monthlyPaymentsAmount = 0;
+  let dailyTopupsAmount = 0;
+  let monthlyTopupsAmount = 0;
 
-  if (!company) return <div>Company not found</div>;
+  try {
+    const [
+      loadedCompany,
+      loadedCustomersActive,
+      loadedCustomersExpired,
+      loadedCustomersSuspended,
+      loadedPlansTotal,
+      loadedPaymentsPending,
+      dailyPayments,
+      monthlyPayments,
+      loadedFailedActivations,
+      loadedRecentCustomers,
+      loadedRecentPayments,
+      loadedRouters,
+      _tokensGeneratedToday,
+      loadedTokensUnused,
+      dailyTopups,
+      monthlyTopups,
+    ] = await Promise.all([
+      prisma.company.findUnique({ where: { id: user.companyId } }),
+      prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.ACTIVE } }),
+      prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.EXPIRED } }),
+      prisma.customer.count({ where: { ...tenantWhere, status: CustomerStatus.SUSPENDED } }),
+      prisma.plan.count({ where: tenantWhere }),
+      prisma.payment.count({ where: { ...tenantWhere, status: "PENDING" } }),
+      prisma.payment.aggregate({
+        where: {
+          ...tenantWhere,
+          status: "APPROVED",
+          createdAt: { gte: startOfDay },
+          OR: [{ createdByUserId: null }, { createdByUser: { role: { not: Role.COMPANY_AGENT } } }],
+        },
+        _sum: { amount: true },
+      }),
+      prisma.payment.aggregate({
+        where: {
+          ...tenantWhere,
+          status: "APPROVED",
+          createdAt: { gte: startOfMonth },
+          OR: [{ createdByUserId: null }, { createdByUser: { role: { not: Role.COMPANY_AGENT } } }],
+        },
+        _sum: { amount: true },
+      }),
+      prisma.internetSubscription.count({
+        where: { ...tenantWhere, networkActivationStatus: "FAILED" },
+      }),
+      prisma.customer.findMany({
+        where: tenantWhere,
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
+      prisma.payment.findMany({
+        where: tenantWhere,
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: { customer: { select: { fullName: true } } },
+      }),
+      prisma.router.findMany({ where: tenantWhere }),
+      prisma.accessToken.count({ where: { ...tenantWhere, createdAt: { gte: startOfDay } } }),
+      prisma.accessToken.count({ where: { ...tenantWhere, status: "UNUSED" } }),
+      prisma.walletTransaction.aggregate({
+        where: { companyId: user.companyId, source: "ADMIN_TOPUP", type: "CREDIT", createdAt: { gte: startOfDay } },
+        _sum: { amount: true },
+      }),
+      prisma.walletTransaction.aggregate({
+        where: { companyId: user.companyId, source: "ADMIN_TOPUP", type: "CREDIT", createdAt: { gte: startOfMonth } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    company = loadedCompany;
+    customersActive = loadedCustomersActive;
+    customersExpired = loadedCustomersExpired;
+    customersSuspended = loadedCustomersSuspended;
+    plansTotal = loadedPlansTotal;
+    paymentsPending = loadedPaymentsPending;
+    failedActivations = loadedFailedActivations;
+    recentCustomers = loadedRecentCustomers;
+    recentPayments = loadedRecentPayments;
+    routers = loadedRouters;
+    tokensUnused = loadedTokensUnused;
+    dailyPaymentsAmount = Number(dailyPayments?._sum?.amount ?? 0);
+    monthlyPaymentsAmount = Number(monthlyPayments?._sum?.amount ?? 0);
+    dailyTopupsAmount = Number(dailyTopups?._sum?.amount ?? 0);
+    monthlyTopupsAmount = Number(monthlyTopups?._sum?.amount ?? 0);
+  } catch {
+    return (
+      <DashboardEmptyState
+        title="Dashboard indisponible"
+        description="Une erreur est survenue pendant le chargement des statistiques. Réessayez, puis contactez le support si le problème persiste."
+      />
+    );
+  }
+
+  if (!company) {
+    return (
+      <DashboardEmptyState
+        title="Company introuvable"
+        description="Aucune company active n'est liée à ce compte administrateur."
+      />
+    );
+  }
 
   const currency = company.currency;
   const routerOnline = routers.some(r => r.status === "ONLINE");
   const routerStatusText = routers.length === 0 ? "No Router" : routerOnline ? "En ligne" : "Hors ligne";
+  const companyLocation = [company.city, company.country].filter(Boolean).join(", ") || "Localisation non renseignée";
+  const hasAnyCoreData = customersActive + customersExpired + customersSuspended + plansTotal + recentPayments.length + routers.length > 0;
 
   return (
     <div className="space-y-8">
       {/* 1. HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-white">{company.name}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-white">{company.name || "Ma Company"}</h1>
           <div className="flex flex-wrap items-center gap-4 text-sm text-white/60">
-            <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {company.city}, {company.country}</span>
+            <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {companyLocation}</span>
             <span className="flex items-center gap-1"><DollarSign className="w-4 h-4" /> {currency}</span>
             <span className="flex items-center gap-1">
               <Server className={`w-4 h-4 ${routerOnline ? 'text-green-400' : 'text-red-400'}`} /> 
@@ -222,12 +334,21 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {!hasAnyCoreData ? (
+        <DashboardEmptyState
+          title="Company prête à démarrer"
+          description="Aucune donnée métier n'existe encore (routeur, forfait, client ou paiement). Commencez par configurer un routeur MikroTik puis créez un forfait."
+          ctaHref="/dashboard/routers"
+          ctaLabel="Configurer MikroTik"
+        />
+      ) : null}
+
       {/* 2. KPI CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Clients actifs" value={customersActive} icon={Users} trend="Connectés" trendUp={true} />
         <StatCard title="Tokens Non Utilisés" value={tokensUnused} icon={KeyRound} trend="En stock" trendUp={true} />
-        <StatCard title="Revenus (Aujourd'hui)" value={formatCurrency(((Number(dailyPayments._sum.amount) || 0) + (Number(dailyTopups._sum.amount) || 0)).toString(), currency)} icon={CreditCard} trend="Ventes directes + Recharges" trendUp={true} />
-        <StatCard title="Revenus (Ce mois)" value={formatCurrency(((Number(monthlyPayments._sum.amount) || 0) + (Number(monthlyTopups._sum.amount) || 0)).toString(), currency)} icon={Activity} />
+        <StatCard title="Revenus (Aujourd'hui)" value={formatCurrency((dailyPaymentsAmount + dailyTopupsAmount).toString(), currency)} icon={CreditCard} trend="Ventes directes + Recharges" trendUp={true} />
+        <StatCard title="Revenus (Ce mois)" value={formatCurrency((monthlyPaymentsAmount + monthlyTopupsAmount).toString(), currency)} icon={Activity} />
       </div>
 
       {/* ALERTES SI NECESSAIRE */}
@@ -333,7 +454,7 @@ export default async function DashboardPage() {
                 ) : (
                   recentPayments.map(p => (
                     <tr key={p.id}>
-                      <td className="py-3 pr-4 text-white/90 truncate max-w-[120px]">{p.customer?.fullName}</td>
+                      <td className="py-3 pr-4 text-white/90 truncate max-w-[120px]">{p.customer?.fullName || "Client inconnu"}</td>
                       <td className="py-3 pr-4 text-white/90">{formatCurrency(p.amount.toString(), currency)}</td>
                       <td className="py-3"><StatusBadge status={p.status} /></td>
                     </tr>
