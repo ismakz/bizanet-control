@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { isHotspotLoginHostname } from '@/lib/hotspot-login-url';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get('host') || request.nextUrl.hostname;
+  const isHotspotHost = isHotspotLoginHostname(host);
 
   // 1. Ajouter exceptions
   if (
@@ -56,11 +59,16 @@ export function middleware(request: NextRequest) {
   }
 
   // 4. Bonus : Si utilisateur connecté et va sur /login → redirect /dashboard
-  if (pathname === '/login') {
+  // (sauf portail hotspot login.bizanet)
+  if (pathname === '/login' && !isHotspotHost) {
     console.log(`[Middleware] pathname: ${pathname}, hasCookie: ${!!token}, isValid: ${isValid}, redirectTarget: ${isValid ? '/dashboard' : 'next'}`);
     if (isValid) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
+  }
+
+  if (pathname === '/hotspot/login') {
+    return NextResponse.next();
   }
 
   // 5. Protéger /change-password

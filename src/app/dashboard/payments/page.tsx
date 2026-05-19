@@ -136,6 +136,44 @@ export default function PaymentsPage() {
         } else {
           alert("✅ " + data.message);
         }
+
+        const meRes = await fetch("/api/auth/me");
+        const me = await meRes.json().catch(() => ({}));
+        const role = me.user?.role as string | undefined;
+        const canHotspotAgent =
+          role === "COMPANY_ADMIN" || role === "BIZANET_CEO";
+        if (
+          canHotspotAgent &&
+          data.payment?.customerId &&
+          data.subscription
+        ) {
+          if (
+            confirm(
+              "Créer aussi l'utilisateur hotspot sur MikroTik via BizaNet-Agent ?"
+            )
+          ) {
+            const hRes = await fetch("/api/hotspot/create", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                customerId: data.payment.customerId,
+                profile: "default",
+              }),
+            });
+            const hData = await hRes.json().catch(() => ({}));
+            if (hRes.ok) {
+              alert("Client activé sur MikroTik");
+            } else {
+              const msg =
+                (typeof hData?.error === "string" && hData.error) ||
+                (typeof hData?.message === "string" && hData.message) ||
+                `Erreur ${hRes.status}`;
+              alert(msg);
+            }
+          }
+        }
+
         await load();
       } else {
         alert("Erreur: " + (data.error || "Une erreur est survenue"));

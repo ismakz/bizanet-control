@@ -1,5 +1,6 @@
 import { X, Printer } from "lucide-react";
 import { formatDuration } from "@/lib/time";
+import { buildHotspotTicketLoginUrl } from "@/lib/hotspot-login-url";
 import { QRCodeCanvas } from "qrcode.react";
 
 type BatchTokenPrintModalProps = {
@@ -37,7 +38,12 @@ export function BatchTokenPrintModal({ tokens, onClose }: BatchTokenPrintModalPr
         {/* Zone d'impression */}
         <div className="print-area">
           {tokens.map((tokenData, index) => {
-            const activationUrl = `${window.location.origin}/portal/activate?token=${tokenData.token}`;
+            const isHotspotWifi =
+              !tokenData.plan?.accessType ||
+              tokenData.plan.accessType === "HOTSPOT_WIFI";
+            const activationUrl = isHotspotWifi
+              ? buildHotspotTicketLoginUrl(tokenData.token)
+              : `${window.location.origin}/portal/activate?token=${tokenData.token}`;
             
             return (
               <div 
@@ -85,10 +91,9 @@ export function BatchTokenPrintModal({ tokens, onClose }: BatchTokenPrintModalPr
                     </>
                   ) : (
                     <>
-                      <p>1. Connectez-vous au WiFi BizaNet</p>
-                      <p>2. Ouvrez la page d'activation si besoin</p>
-                      <p>3. Scannez le QR ou entrez le token</p>
-                      <p>4. Internet activé</p>
+                      <p>1. Connectez-vous au WiFi hotspot</p>
+                      <p>2. Scannez le QR (connexion auto)</p>
+                      <p>3. Code : {tokenData.token}</p>
                     </>
                   )}
                 </div>

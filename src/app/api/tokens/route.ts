@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { TokenStatus, Role, PaymentMethod, PaymentStatus, TransactionType, TransactionSource } from "@prisma/client";
+import {
+  TokenStatus,
+  Role,
+  PaymentMethod,
+  PaymentStatus,
+  TransactionType,
+  TransactionSource,
+  AccessType,
+} from "@prisma/client";
 import { getAuthContextFromRequest, requireRole } from "@/lib/auth";
 import { getTenantWhere } from "@/lib/permissions";
 import { writeAuditLog } from "@/lib/audit";
+import {
+  buildTokenHotspotCredentials,
+  createHotspotUserOnAgent,
+} from "@/lib/mikrotik-agent";
 
 function generateToken() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Removed confusing chars like 1, I, 0, O
@@ -170,7 +182,79 @@ export async function POST(req: Request) {
         : `${parsed.quantity} tokens générés pour le forfait ${plan.name}`,
     });
 
-    return NextResponse.json({ success: true, count: newTokens.length, tokens: newTokens.map(t => ({ ...t, plan, company })) }, { status: 201 });
+    const mikrotikResults: {
+      token: string;
+      ok: boolean;
+      error?: string;
+    }[] = [];
+
+    if (plan.accessType === AccessType.HOTSPOT_WIFI) {
+      const saleLabel = parsed.isQuickSale ? "Quick Sale" : "Token Generate";
+
+      for (const accessToken of newTokens) {
+        const credentials = buildTokenHotspotCredentials(accessToken.token);
+
+        console.log("[Quick Sale MikroTik] request", {
+          context: saleLabel,
+          tokenId: accessToken.id,
+          token: accessToken.token,
+          profile: credentials.profile,
+          agentPayload: {
+            username: credentials.username,
+            password: credentials.password,
+            profile: credentials.profile,
+            comment: credentials.comment,
+          },
+        });
+
+        const agentResult = await createHotspotUserOnAgent(
+          credentials,
+          `${saleLabel} token:${accessToken.token}`
+        );
+
+        if (!agentResult.ok) {
+          console.error("[MikroTik Error]", {
+            context: saleLabel,
+            token: accessToken.token,
+            error: agentResult.error,
+            agent: agentResult.data,
+          });
+
+          mikrotikResults.push({
+            token: accessToken.token,
+            ok: false,
+            error: agentResult.error,
+          });
+
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Échec création hotspot MikroTik pour ${accessToken.token}: ${agentResult.error}`,
+              token: accessToken.token,
+              mikrotik: mikrotikResults,
+              tokensCreatedInDb: newTokens.length,
+              agent: agentResult.data,
+            },
+            { status: agentResult.status }
+          );
+        }
+
+        mikrotikResults.push({ token: accessToken.token, ok: true });
+      }
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        count: newTokens.length,
+        tokens: newTokens.map((t) => ({ ...t, plan, company })),
+        mikrotik:
+          mikrotikResults.length > 0
+            ? { synced: true, results: mikrotikResults }
+            : { synced: false, reason: "accessType not HOTSPOT_WIFI" },
+      },
+      { status: 201 }
+    );
   } catch (e: unknown) {
     if (e instanceof z.ZodError) {
       return NextResponse.json({ error: e.issues.map(i => i.message).join(", ") }, { status: 400 });

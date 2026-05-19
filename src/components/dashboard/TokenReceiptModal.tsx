@@ -1,5 +1,6 @@
 import { X, Printer, Copy, Wifi, Link as LinkIcon } from "lucide-react";
 import { formatDuration } from "@/lib/time";
+import { buildHotspotTicketLoginUrl } from "@/lib/hotspot-login-url";
 import { QRCodeCanvas } from "qrcode.react";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -16,15 +17,25 @@ type TokenReceiptModalProps = {
 export function TokenReceiptModal({ tokenData, onClose }: TokenReceiptModalProps) {
   if (!tokenData) return null;
 
-  const activationUrl = `${window.location.origin}/portal/activate?token=${tokenData.token}`;
+  const isHotspotWifi =
+    !tokenData.plan?.accessType || tokenData.plan.accessType === "HOTSPOT_WIFI";
+  const hotspotLoginUrl = buildHotspotTicketLoginUrl(tokenData.token);
+  const activationUrl = isHotspotWifi
+    ? hotspotLoginUrl
+    : `${typeof window !== "undefined" ? window.location.origin : ""}/portal/activate?token=${tokenData.token}`;
 
   const handlePrint = () => {
     window.print();
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(tokenData.token);
-    alert("Code copié dans le presse-papier !");
+    const text = isHotspotWifi ? hotspotLoginUrl : tokenData.token;
+    navigator.clipboard.writeText(text);
+    alert(
+      isHotspotWifi
+        ? "Lien de connexion hotspot copié !"
+        : "Code copié dans le presse-papier !"
+    );
   };
 
   const handleCopyLink = () => {
@@ -34,7 +45,10 @@ export function TokenReceiptModal({ tokenData, onClose }: TokenReceiptModalProps
 
   const handleWhatsApp = () => {
     const duration = formatDuration(tokenData.plan.durationValue, tokenData.plan.durationUnit);
-    const message = `Bonjour 👋\n\nVoici votre accès internet :\n\nToken : ${tokenData.token}\n\nForfait : ${tokenData.plan.name}\nDurée : ${duration}\n\n👉 Activez ici :\n${activationUrl}\n\nMerci 🙏`;
+    const linkLine = isHotspotWifi
+      ? `👉 Connectez-vous au WiFi puis ouvrez :\n${hotspotLoginUrl}`
+      : `👉 Activez ici :\n${activationUrl}`;
+    const message = `Bonjour 👋\n\nVoici votre accès internet :\n\nCode : ${tokenData.token}\n\nForfait : ${tokenData.plan.name}\nDurée : ${duration}\n\n${linkLine}\n\nMerci 🙏`;
     
     const encodedMessage = encodeURIComponent(message);
     const phone = tokenData.assignedCustomer?.phone || "";
@@ -49,7 +63,10 @@ export function TokenReceiptModal({ tokenData, onClose }: TokenReceiptModalProps
   const handleShare = async () => {
     const shareData = {
       title: "Code d'accès Internet",
-      text: `Voici votre code d'accès internet : ${tokenData.token}\nForfait: ${tokenData.plan.name}\nActivez-le sur le portail captif.`,
+      text: isHotspotWifi
+        ? `Code WiFi : ${tokenData.token}\nForfait: ${tokenData.plan.name}\nConnexion: ${hotspotLoginUrl}`
+        : `Voici votre code d'accès internet : ${tokenData.token}\nForfait: ${tokenData.plan.name}\nActivez-le sur le portail captif.`,
+      url: isHotspotWifi ? hotspotLoginUrl : undefined,
     };
     if (navigator.share) {
       try {
@@ -137,10 +154,10 @@ export function TokenReceiptModal({ tokenData, onClose }: TokenReceiptModalProps
               </>
             ) : (
               <>
-                <p>1. Connectez-vous au WiFi BizaNet</p>
-                <p>2. Ouvrez la page d'activation si besoin</p>
-                <p>3. Scannez le QR ou entrez le token</p>
-                <p>4. Internet activé</p>
+                <p>1. Connectez-vous au WiFi hotspot</p>
+                <p>2. Scannez le QR code (connexion auto)</p>
+                <p>3. Ou ouvrez : login.bizanet</p>
+                <p>4. Code : {tokenData.token}</p>
               </>
             )}
           </div>

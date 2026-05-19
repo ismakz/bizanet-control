@@ -8,3 +8,6 @@ dev.db
 nPhoneKIT/
 nPhoneKIT
 
+.vercel
+.env*.local
+tsconfig.tsbuildinfo

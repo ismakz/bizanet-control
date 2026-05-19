@@ -24,23 +24,29 @@ export default function PortalLandingPage() {
 
       scanner.render(
         (decodedText) => {
-          // Si le QR contient une URL complète ex: https://bizanet-control.vercel.app/portal/activate?token=TOKEN
           try {
             const url = new URL(decodedText);
+            const username = url.searchParams.get("username");
+            const password = url.searchParams.get("password");
+
+            if (username && password) {
+              scanner.clear();
+              window.location.href = decodedText;
+              return;
+            }
+
             const tokenParam = url.searchParams.get("token");
             if (tokenParam) {
               scanner.clear();
               router.push(`/portal/activate?token=${tokenParam}`);
-            } else {
-              // Si le QR contient juste le token
-              scanner.clear();
-              router.push(`/portal/activate?token=${decodedText}`);
+              return;
             }
           } catch {
-            // Pas une URL, on assume que c'est le token direct
-            scanner.clear();
-            router.push(`/portal/activate?token=${decodedText}`);
+            // pas une URL
           }
+
+          scanner.clear();
+          router.push(`/portal/activate?token=${decodedText}`);
         },
         (error) => {
           // Ignorer les erreurs de scan continu

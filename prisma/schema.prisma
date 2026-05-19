@@ -296,6 +296,11 @@ model Customer {
   nextDueAt DateTime?
   gracePeriodDays Int @default(0)
   accessType AccessType @default(HOTSPOT_WIFI)
+  hotspotUsername   String?
+  hotspotPassword   String?
+  hotspotProfile    String?
+  hotspotEnabled    Boolean   @default(false)
+  hotspotCreatedAt  DateTime?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 

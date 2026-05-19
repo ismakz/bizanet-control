@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { DataTable } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { Users, Play, Pause, Plus, Search, LogOut } from "lucide-react";
+import { Users, Play, Pause, Plus, Search, LogOut, Router } from "lucide-react";
 import Link from "next/link";
 
 type CustomerItem = {
@@ -20,16 +20,22 @@ type CustomerItem = {
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isCeo, setIsCeo] = useState<boolean>(false);
-  
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [hotspotLoadingId, setHotspotLoadingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
 
+  const isCeo = userRole === "BIZANET_CEO";
+  const canHotspotAgent =
+    userRole === "COMPANY_ADMIN" || userRole === "BIZANET_CEO";
+
   useEffect(() => {
     fetch("/api/auth/me")
-      .then(r => r.json())
-      .then(d => setIsCeo(d.user?.role === "BIZANET_CEO"))
-      .catch(() => {});
+      .then((r) => r.json())
+      .then((d) => setUserRole(d.user?.role ?? null))
+      .catch(() => setUserRole(null));
   }, []);
 
   const fetchCustomers = async () => {
@@ -99,6 +105,36 @@ export default function CustomersPage() {
     }
   };
 
+  const activateOnMikrotikAgent = async (customerId: string) => {
+    setHotspotLoadingId(customerId);
+    setToast(null);
+    try {
+      const res = await fetch("/api/hotspot/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ customerId, profile: "default" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setToast({ kind: "ok", text: "Client activé sur MikroTik" });
+      } else {
+        const msg =
+          (typeof data?.error === "string" && data.error) ||
+          (typeof data?.message === "string" && data.message) ||
+          `Erreur ${res.status}`;
+        setToast({ kind: "err", text: msg });
+      }
+    } catch (e) {
+      setToast({
+        kind: "err",
+        text: e instanceof Error ? e.message : "Erreur réseau",
+      });
+    } finally {
+      setHotspotLoadingId(null);
+    }
+  };
+
   const columns = [
     { header: "Nom", accessorKey: "fullName" as const },
     { header: "Téléphone", accessorKey: "phone" as const },
@@ -111,40 +147,65 @@ export default function CustomersPage() {
       header: "Expire le", 
       cell: (c: CustomerItem) => new Date(c.expiresAt).toLocaleDateString() 
     },
-    ...(isCeo ? [] : [{
-      header: "Actions",
-      cell: (c: CustomerItem) => (
-        <div className="flex gap-2">
-          {c.subscriptions?.[0]?.networkActivationStatus === "FAILED" && (
-            <button 
-              onClick={() => retryActivation(c.subscriptions![0].id)}
-              className="flex items-center gap-1 px-3 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/20 transition text-xs font-medium"
-            >
-              <Play className="w-3 h-3" /> Retry Réseau
-            </button>
-          )}
-          <button 
-            onClick={() => activateCustomer(c.id)}
-            className="flex items-center gap-1 px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg hover:bg-green-500/20 transition text-xs font-medium"
-          >
-            <Play className="w-3 h-3" /> Activer
-          </button>
-          <button 
-            onClick={() => suspendCustomer(c.id)}
-            className="flex items-center gap-1 px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition text-xs font-medium"
-          >
-            <Pause className="w-3 h-3" /> Suspendre
-          </button>
-          <button 
-            onClick={() => disconnectCustomer(c.id)}
-            className="flex items-center gap-1 px-3 py-1 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-lg hover:bg-orange-500/20 transition text-xs font-medium"
-            title="Déconnecter la session actuelle"
-          >
-            <LogOut className="w-3 h-3" /> Kick
-          </button>
-        </div>
-      )
-    }])
+    ...(!isCeo || canHotspotAgent
+      ? [
+          {
+            header: "Actions",
+            cell: (c: CustomerItem) => (
+              <div className="flex flex-wrap gap-2">
+                {canHotspotAgent && (
+                  <button
+                    type="button"
+                    disabled={hotspotLoadingId === c.id}
+                    onClick={() => activateOnMikrotikAgent(c.id)}
+                    className="flex items-center gap-1 px-3 py-1 bg-cyan/10 text-cyan border border-cyan/25 rounded-lg hover:bg-cyan/20 transition text-xs font-medium disabled:opacity-50"
+                    title="Créer l'utilisateur hotspot via BizaNet-Agent (MikroTik)"
+                  >
+                    <Router className="w-3 h-3" />{" "}
+                    {hotspotLoadingId === c.id
+                      ? "…"
+                      : "Activer sur MikroTik"}
+                  </button>
+                )}
+                {!isCeo && (
+                  <>
+                    {c.subscriptions?.[0]?.networkActivationStatus ===
+                      "FAILED" && (
+                      <button
+                        onClick={() =>
+                          retryActivation(c.subscriptions![0].id)
+                        }
+                        className="flex items-center gap-1 px-3 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/20 transition text-xs font-medium"
+                      >
+                        <Play className="w-3 h-3" /> Retry Réseau
+                      </button>
+                    )}
+                    <button
+                      onClick={() => activateCustomer(c.id)}
+                      className="flex items-center gap-1 px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg hover:bg-green-500/20 transition text-xs font-medium"
+                    >
+                      <Play className="w-3 h-3" /> Activer
+                    </button>
+                    <button
+                      onClick={() => suspendCustomer(c.id)}
+                      className="flex items-center gap-1 px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition text-xs font-medium"
+                    >
+                      <Pause className="w-3 h-3" /> Suspendre
+                    </button>
+                    <button
+                      onClick={() => disconnectCustomer(c.id)}
+                      className="flex items-center gap-1 px-3 py-1 bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-lg hover:bg-orange-500/20 transition text-xs font-medium"
+                      title="Déconnecter la session actuelle"
+                    >
+                      <LogOut className="w-3 h-3" /> Kick
+                    </button>
+                  </>
+                )}
+              </div>
+            ),
+          },
+        ]
+      : [])
   ];
 
   const filteredCustomers = useMemo(() => {
@@ -212,6 +273,18 @@ export default function CustomersPage() {
       {error && (
         <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {error}
+        </div>
+      )}
+
+      {toast && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            toast.kind === "ok"
+              ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-100"
+              : "border-red-400/30 bg-red-500/10 text-red-200"
+          }`}
+        >
+          {toast.text}
         </div>
       )}
 
