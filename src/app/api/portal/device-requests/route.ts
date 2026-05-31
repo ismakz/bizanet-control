@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Code d'accès invalide." }, { status: 404 });
     }
 
-    if (accessToken.status !== TokenStatus.ACTIVE) {
+    if (accessToken.status !== TokenStatus.ACTIVE && accessToken.status !== TokenStatus.USED) {
       return NextResponse.json({ error: "Ce code n'est pas actif." }, { status: 400 });
     }
 

@@ -1,26 +1,23 @@
 import { NextResponse } from "next/server";
 import { getAuthContextFromRequest } from "@/lib/auth";
-import { getActiveUsers, getDhcpLeases, getPppoeActiveUsers } from "@/lib/mikrotik";
+import { getRouterLiveStats } from "@/lib/mikrotik";
+import { cloudRouterBlockedResponse, isCloudRouterBlocked } from "@/lib/router-access";
 
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const auth = await getAuthContextFromRequest(req);
+    if (isCloudRouterBlocked()) {
+      return NextResponse.json(cloudRouterBlockedResponse());
+    }
+
+    await getAuthContextFromRequest(req);
     const params = await context.params;
     const routerId = params.id;
-
-    // Concurrency to load everything
-    const [hotspotUsers, dhcpLeases, pppoeUsers] = await Promise.all([
-      getActiveUsers(routerId),
-      getDhcpLeases(routerId),
-      getPppoeActiveUsers(routerId)
-    ]);
-
-    const activeDhcp = dhcpLeases.filter((l: any) => l.status === "bound");
+    const live = await getRouterLiveStats(routerId);
 
     return NextResponse.json({
-      wifiCount: hotspotUsers.length,
-      dhcpCount: activeDhcp.length,
-      pppoeCount: pppoeUsers.length
+      wifiCount: live.wifiClients,
+      dhcpCount: live.ethernetClients,
+      pppoeCount: live.pppoeClients
     });
   } catch (e: unknown) {
     if (e instanceof Error && e.message === "UNAUTHENTICATED") {

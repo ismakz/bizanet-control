@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Role } from "@prisma/client";
 import { getAuthContextFromRequest, requireRole } from "@/lib/auth";
 import { getTenantWhere } from "@/lib/permissions";
-import { disconnectUser } from "@/lib/mikrotik";
+import { disconnectUser, syncHotspotStatus } from "@/lib/mikrotik";
 import { writeAuditLog } from "@/lib/audit";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -29,10 +29,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     // Déconnecter l'utilisateur sur le MikroTik
     await disconnectUser(customer.id);
+    await syncHotspotStatus(customer.id);
 
-    // Optionnel: On peut aussi "reset" son boundDeviceId s'il y a un token actif
     const activeToken = await prisma.accessToken.findFirst({
-      where: { assignedCustomerId: customer.id, status: "ACTIVE" }
+      where: {
+        assignedCustomerId: customer.id,
+        status: { in: ["ACTIVE", "USED"] },
+      },
     });
 
     if (activeToken && activeToken.boundDeviceId) {

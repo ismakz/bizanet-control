@@ -107,6 +107,7 @@ enum TokenStatus {
   ACTIVE
   USED
   EXPIRED
+  SUSPENDED
   CANCELLED
 }
 
@@ -557,6 +558,13 @@ model AccessToken {
   boundPhone         String?
   firstActivatedAt   DateTime?
   lastDeviceCheckAt  DateTime?
+  totalSeconds       Int          @default(0)
+  remainingSeconds   Int          @default(0)
+  consumedSeconds    Int          @default(0)
+  lastConnectedAt    DateTime?
+  lastDisconnectedAt DateTime?
+  isOnline           Boolean      @default(false)
+  expiredAt          DateTime?
   maxDevices         Int          @default(1)
   allowDeviceChange  Boolean      @default(false)
   createdAt          DateTime     @default(now())
