@@ -5,9 +5,14 @@ import { assertCompanyAccess, requireOneOfRoles } from "@/lib/permissions";
 import { Role } from "@prisma/client";
 import { testRouterConnection } from "@/lib/mikrotik";
 import { writeAuditLog } from "@/lib/audit";
+import { cloudRouterBlockedResponse, isCloudRouterBlocked } from "@/lib/router-access";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
+    if (isCloudRouterBlocked()) {
+      return NextResponse.json(cloudRouterBlockedResponse(), { status: 200 });
+    }
+
     const auth = await getAuthContextFromRequest(req);
     requireOneOfRoles(auth, [Role.BIZANET_CEO, Role.COMPANY_ADMIN]);
 
@@ -22,6 +27,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     assertCompanyAccess(auth, router.companyId);
 
     const result = await testRouterConnection(router.id);
+
+    if ("localOnly" in result && result.localOnly) {
+      return NextResponse.json(cloudRouterBlockedResponse(), { status: 200 });
+    }
 
     await writeAuditLog({
       auth,

@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LocalRouterOnlyBanner } from "@/components/router/LocalRouterOnlyBanner";
+import {
+  fetchRouterAccessMode,
+  LOCAL_ROUTER_UI_MESSAGE,
+  type RouterAccessMode,
+} from "@/lib/router-access-client";
 
 type RouterItem = {
   id: string;
@@ -52,8 +58,10 @@ export default function RoutersPage() {
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [form, setForm] = useState<RouterFormState>(initialForm);
+  const [routerAccess, setRouterAccess] = useState<RouterAccessMode | null>(null);
 
   useEffect(() => {
+    fetchRouterAccessMode().then(setRouterAccess).catch(() => null);
     fetch("/api/auth/me")
       .then(r => r.json())
       .then(d => setIsCeo(d.user?.role === "BIZANET_CEO"))
@@ -75,14 +83,22 @@ export default function RoutersPage() {
   }, []);
 
   const testRouter = async (id: string) => {
+    if (routerAccess?.cloudRouterBlocked) {
+      setError(LOCAL_ROUTER_UI_MESSAGE);
+      setMessage(null);
+      return;
+    }
     setTestingId(id);
     const res = await fetch(`/api/routers/${id}/test`, { method: "POST" });
     const data = await res.json();
-    if (res.ok) {
+    if (data.localOnly) {
+      setError(data.message || LOCAL_ROUTER_UI_MESSAGE);
+      setMessage(null);
+    } else if (res.ok && data.success !== false) {
       setMessage(data.message || "MikroTik connecté avec succès.");
       setError(null);
     } else {
-      setError(data.error || "Impossible de joindre MikroTik. Vérifiez IP, port, username, password et accès API.");
+      setError(data.error || data.message || "Impossible de joindre MikroTik. Vérifiez IP, port, username, password et accès API.");
       setMessage(null);
     }
     setTestingId(null);
@@ -171,6 +187,7 @@ export default function RoutersPage() {
 
   return (
     <div className="space-y-4">
+      {routerAccess?.cloudRouterBlocked ? <LocalRouterOnlyBanner /> : null}
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-white">Routers</h1>
         <button

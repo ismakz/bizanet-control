@@ -3,6 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     serverComponentsExternalPackages: ["routeros-client", "node-routeros"],
+    instrumentationHook: true,
   },
   webpack: (config) => {
     const path = require("path");

@@ -1,6 +1,6 @@
 import { HotspotLoginPortal } from "@/components/hotspot/HotspotLoginPortal";
 
-/** Route de secours : /hotspot/login (même UI que login.bizanet/login) */
+/** Portail hotspot : /hotspot/login?username=CODE&password=CODE */
 export default function HotspotLoginRoutePage() {
   return <HotspotLoginPortal />;
 }
