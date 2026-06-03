@@ -24,9 +24,16 @@ export async function PATCH(
     const isCompanyAdmin =
       user.role === Role.COMPANY_ADMIN && user.companyId === params.id;
 
+    if (user.role === Role.COMPANY_AGENT) {
+      return NextResponse.json(
+        { error: "Les agents ne peuvent pas modifier le branding de l'entreprise." },
+        { status: 403 }
+      );
+    }
+
     if (!isCeo && !isCompanyAdmin) {
       return NextResponse.json(
-        { error: "Seul le COMPANY ADMIN peut modifier le nom de l'entreprise." },
+        { error: "Accès refusé. Rôle non autorisé pour cette action." },
         { status: 403 }
       );
     }

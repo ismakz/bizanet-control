@@ -77,7 +77,7 @@ export async function GET(req: Request) {
         plan: { select: { name: true, durationValue: true, durationUnit: true, downloadLimitMbps: true, uploadLimitMbps: true, accessType: true } },
         assignedCustomer: { select: { fullName: true, username: true, expiresAt: true } },
         generatedByUser: { select: { fullName: true } },
-        company: { select: { name: true, city: true, ownerPhone: true } }
+        company: { select: { name: true, city: true, ownerPhone: true, logoUrl: true } }
       }
     });
     const now = Date.now();
@@ -154,7 +154,7 @@ export async function GET(req: Request) {
             plan: { select: { name: true, durationValue: true, durationUnit: true, downloadLimitMbps: true, uploadLimitMbps: true, accessType: true } },
             assignedCustomer: { select: { fullName: true, username: true, expiresAt: true } },
             generatedByUser: { select: { fullName: true } },
-            company: { select: { name: true, city: true, ownerPhone: true } },
+            company: { select: { name: true, city: true, ownerPhone: true, logoUrl: true } },
           },
         });
         const fallback = legacyTokens.map((t) => ({

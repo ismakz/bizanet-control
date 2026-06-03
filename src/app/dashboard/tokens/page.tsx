@@ -34,7 +34,7 @@ type TokenItem = {
   plan: { name: string; durationValue: number; durationUnit: DurationUnit; downloadLimitMbps?: number; uploadLimitMbps?: number };
   assignedCustomer?: { fullName: string; username: string } | null;
   generatedByUser: { fullName: string };
-  company: { name: string; city: string; ownerPhone?: string };
+  company: { name: string; city: string; ownerPhone?: string; logoUrl?: string | null };
 };
 
 function formatRemaining(ms?: number | null): string {

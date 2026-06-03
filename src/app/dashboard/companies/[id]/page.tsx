@@ -31,9 +31,17 @@ export default async function CompanyDetailsPage({ params }: { params: { id: str
           <Link href="/dashboard/companies" className="text-sm text-cyan hover:underline">&larr; Retour aux compagnies</Link>
           <h1 className="text-2xl font-semibold tracking-tight text-white">{company.name}</h1>
         </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${company.status === 'ACTIVE' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-          {company.status}
-        </span>
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/dashboard/company-settings?companyId=${company.id}`}
+            className="rounded-xl border border-cyan/30 bg-cyan/10 px-4 py-2 text-sm font-medium text-cyan hover:bg-cyan/20"
+          >
+            Branding / nom cybercafé
+          </Link>
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${company.status === 'ACTIVE' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+            {company.status}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
