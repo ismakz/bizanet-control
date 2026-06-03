@@ -3,6 +3,7 @@
 import { ReactNode, useState } from "react";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { DashboardTopbar } from "./DashboardTopbar";
+import { PwaInstallHint } from "@/components/pwa/PwaInstallHint";
 
 interface DashboardShellProps {
   children: ReactNode;
@@ -26,10 +27,11 @@ export function DashboardShell({ children, userName, role, companyName }: Dashbo
       
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
-        <DashboardTopbar 
-          userName={userName} 
-          role={role} 
-          onMenuClick={() => setIsSidebarOpen(true)} 
+        <DashboardTopbar
+          userName={userName}
+          role={role}
+          companyName={companyName}
+          onMenuClick={() => setIsSidebarOpen(true)}
         />
         
         <main className="flex-1 p-4 md:p-8 overflow-y-auto relative">
@@ -37,6 +39,7 @@ export function DashboardShell({ children, userName, role, companyName }: Dashbo
             {children}
           </div>
         </main>
+        <PwaInstallHint />
       </div>
     </div>
   );

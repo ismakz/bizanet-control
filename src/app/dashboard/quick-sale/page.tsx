@@ -14,6 +14,7 @@ export default function QuickSalePage() {
   const [loading, setLoading] = useState(true);
   const [selling, setSelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agentWarning, setAgentWarning] = useState<string | null>(null);
   
   const [form, setForm] = useState({
     planId: "",
@@ -58,6 +59,7 @@ export default function QuickSalePage() {
     
     setSelling(true);
     setError(null);
+    setAgentWarning(null);
 
     try {
       const res = await fetch("/api/tokens", {
@@ -77,6 +79,7 @@ export default function QuickSalePage() {
       if (!res.ok) throw new Error(data.error || "Erreur lors de la vente");
 
       setGeneratedToken(data.tokens[0]);
+      if (data.agentMessage) setAgentWarning(data.agentMessage);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -168,10 +171,19 @@ export default function QuickSalePage() {
         </button>
       </form>
 
+      {agentWarning ? (
+        <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100 text-center">
+          {agentWarning}
+        </p>
+      ) : null}
+
       {generatedToken && (
         <TokenReceiptModal 
           tokenData={generatedToken} 
-          onClose={() => setGeneratedToken(null)} 
+          onClose={() => {
+            setGeneratedToken(null);
+            setAgentWarning(null);
+          }} 
         />
       )}
     </div>

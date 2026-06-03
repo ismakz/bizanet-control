@@ -1,6 +1,10 @@
 import { X, Printer, Copy, Wifi, Link as LinkIcon } from "lucide-react";
 import { formatDuration } from "@/lib/time";
-import { buildHotspotTicketLoginUrl } from "@/lib/hotspot-login-url";
+import {
+  buildHotspotTicketLoginUrl,
+  getHotspotTicketLoginDisplayUrl,
+  HOTSPOT_TICKET_LOGIN_ORIGIN,
+} from "@/lib/hotspot-login-url";
 import { QRCodeCanvas } from "qrcode.react";
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
@@ -22,7 +26,7 @@ export function TokenReceiptModal({ tokenData, onClose }: TokenReceiptModalProps
   const hotspotLoginUrl = buildHotspotTicketLoginUrl(tokenData.token);
   const activationUrl = isHotspotWifi
     ? hotspotLoginUrl
-    : `${typeof window !== "undefined" ? window.location.origin : ""}/portal/activate?token=${tokenData.token}`;
+    : `${HOTSPOT_TICKET_LOGIN_ORIGIN}/portal/activate?token=${encodeURIComponent(tokenData.token)}`;
 
   const handlePrint = () => {
     window.print();
@@ -156,7 +160,7 @@ export function TokenReceiptModal({ tokenData, onClose }: TokenReceiptModalProps
               <>
                 <p>1. Connectez-vous au WiFi hotspot</p>
                 <p>2. Scannez le QR code (connexion auto)</p>
-                <p>3. Ou ouvrez : login.bizanet</p>
+                <p>3. Ou ouvrez : {getHotspotTicketLoginDisplayUrl()}</p>
                 <p>4. Code : {tokenData.token}</p>
               </>
             )}

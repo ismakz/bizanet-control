@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#050A10" />
+    <title>BizaNet Control — Hors ligne</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, sans-serif;
+        background: #050a10;
+        color: #e2e8f0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        text-align: center;
+      }
+      .card {
+        max-width: 22rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1rem;
+        padding: 2rem;
+        background: rgba(11, 19, 30, 0.9);
+      }
+      h1 { font-size: 1.25rem; margin-bottom: 0.75rem; color: #22d3ee; }
+      p { font-size: 0.9rem; color: rgba(255, 255, 255, 0.6); line-height: 1.5; }
+      button {
+        margin-top: 1.25rem;
+        background: #22d3ee;
+        color: #050a10;
+        border: none;
+        border-radius: 0.75rem;
+        padding: 0.65rem 1.25rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>BizaNet Control</h1>
+      <p>Vous êtes hors ligne. Reconnectez-vous à Internet puis réessayez.</p>
+      <button type="button" onclick="location.reload()">Réessayer</button>
+    </div>
+  </body>
+</html>

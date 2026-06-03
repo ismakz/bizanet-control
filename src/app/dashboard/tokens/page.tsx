@@ -2,25 +2,56 @@
 
 import { useEffect, useState } from "react";
 import { DataTable } from "@/components/ui/DataTable";
-import { KeyRound, Plus, Copy, Printer, Download, Layers } from "lucide-react";
+import { KeyRound, Plus, Copy, Printer, Download, Layers, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { formatDuration } from "@/lib/time";
 import { TokenReceiptModal } from "@/components/dashboard/TokenReceiptModal";
 import { BatchTokenPrintModal } from "@/components/dashboard/BatchTokenPrintModal";
 import { DurationUnit } from "@prisma/client";
+import { LocalRouterOnlyBanner } from "@/components/router/LocalRouterOnlyBanner";
+import {
+  fetchRouterAccessMode,
+  LOCAL_ROUTER_UI_MESSAGE,
+  type RouterAccessMode,
+} from "@/lib/router-access-client";
 
 type TokenItem = {
   id: string;
   token: string;
   status: string;
+  displayStatus?: "UNUSED" | "ACTIVE" | "OFFLINE" | "EXPIRED";
   price: string;
   currency: string;
   createdAt: string;
+  startedAt?: string | null;
+  expiresAt?: string | null;
+  remainingMs?: number | null;
+  remainingSeconds?: number | null;
+  isOnline?: boolean;
+  consumedSeconds?: number;
+  boundDeviceId?: string | null;
+  mikrotikState?: string;
   plan: { name: string; durationValue: number; durationUnit: DurationUnit; downloadLimitMbps?: number; uploadLimitMbps?: number };
   assignedCustomer?: { fullName: string; username: string } | null;
   generatedByUser: { fullName: string };
-  company: { name: string; city: string; ownerPhone?: string };
+  company: { name: string; city: string; ownerPhone?: string; logoUrl?: string | null };
 };
+
+function formatRemaining(ms?: number | null): string {
+  if (ms === null || ms === undefined) return "-";
+  if (ms <= 0) return "Expiré";
+
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) {
+    return `${days}j ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
+  }
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
 
 export default function TokensPage() {
   const [tokens, setTokens] = useState<TokenItem[]>([]);
@@ -28,6 +59,10 @@ export default function TokensPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedToken, setSelectedToken] = useState<TokenItem | null>(null);
   const [showBatchPrint, setShowBatchPrint] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [tickNow, setTickNow] = useState(Date.now());
+  const [remainingBaselineAt, setRemainingBaselineAt] = useState(Date.now());
+  const [routerAccess, setRouterAccess] = useState<RouterAccessMode | null>(null);
 
   const fetchTokens = async () => {
     setLoading(true);
@@ -36,6 +71,7 @@ export default function TokensPage() {
       if (!res.ok) throw new Error("Erreur lors du chargement des tokens");
       const data = await res.json();
       setTokens(data.tokens || []);
+      setRemainingBaselineAt(Date.now());
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -44,7 +80,13 @@ export default function TokensPage() {
   };
 
   useEffect(() => {
+    fetchRouterAccessMode().then(setRouterAccess).catch(() => null);
     fetchTokens();
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTickNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const copyToClipboard = (text: string) => {
@@ -60,7 +102,7 @@ export default function TokensPage() {
         `"${t.plan.name}"`,
         `"${formatDuration(t.plan.durationValue, t.plan.durationUnit)}"`,
         `${t.price} ${t.currency}`,
-        t.status,
+        t.displayStatus || t.status,
         new Date(t.createdAt).toLocaleDateString()
       ].join(","))
     ].join("\n");
@@ -98,6 +140,31 @@ export default function TokensPage() {
     }).catch(console.error);
   };
 
+  const handleSyncMikrotik = async () => {
+    if (routerAccess?.cloudRouterBlocked) {
+      alert(LOCAL_ROUTER_UI_MESSAGE);
+      return;
+    }
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/hotspot/sync");
+      const data = await res.json();
+      if (data.localOnly) {
+        alert(data.message || LOCAL_ROUTER_UI_MESSAGE);
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || "Erreur de synchronisation");
+      await fetchTokens();
+      alert(
+        `Sync termine: ${data.result?.checked ?? 0} verifies, ${data.result?.started ?? 0} demarres, ${data.result?.expired ?? 0} expires.`
+      );
+    } catch (e: any) {
+      alert(e.message || "Erreur synchronisation MikroTik");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const columns = [
     { 
       header: "Token / Code", 
@@ -115,18 +182,63 @@ export default function TokensPage() {
       header: "Statut", 
       cell: (t: TokenItem) => {
         let color = "bg-white/10 text-white border-white/20";
-        if (t.status === "UNUSED") color = "bg-cyan/10 text-cyan border-cyan/20";
-        if (t.status === "ACTIVE" || t.status === "USED") color = "bg-green-500/10 text-green-400 border-green-500/20";
-        if (t.status === "EXPIRED" || t.status === "CANCELLED") color = "bg-red-500/10 text-red-400 border-red-500/20";
+        const uiStatus = t.displayStatus || "UNUSED";
+        if (uiStatus === "UNUSED") color = "bg-cyan/10 text-cyan border-cyan/20";
+        if (uiStatus === "ACTIVE") color = "bg-green-500/10 text-green-400 border-green-500/20";
+        if (uiStatus === "OFFLINE") color = "bg-amber-500/10 text-amber-300 border-amber-500/20";
+        if (uiStatus === "EXPIRED") color = "bg-red-500/10 text-red-400 border-red-500/20";
         
         return (
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${color}`}>
-            {t.status}
+            {uiStatus}
           </span>
         );
       }
     },
     { header: "Prix", cell: (t: TokenItem) => `${t.price} ${t.currency}` },
+    {
+      header: "Temps restant",
+      cell: (t: TokenItem) => {
+        const uiStatus = t.displayStatus || "UNUSED";
+        if (uiStatus === "EXPIRED") {
+          return <span className="text-xs text-red-300">Expiré</span>;
+        }
+        const isOnline = t.mikrotikState === "ONLINE" || t.isOnline;
+        const elapsedSinceLoad = Math.max(0, tickNow - remainingBaselineAt);
+        const safeRemainingMs = t.remainingMs ?? 0;
+        const dynamicRemaining = isOnline
+          ? Math.max(0, safeRemainingMs - elapsedSinceLoad)
+          : safeRemainingMs;
+        return <span className="text-xs text-white/90">{formatRemaining(dynamicRemaining)}</span>;
+      }
+    },
+    {
+      header: "Connecte depuis",
+      cell: (t: TokenItem) =>
+        t.startedAt ? (
+          <span className="text-xs text-white/90">{new Date(t.startedAt).toLocaleString()}</span>
+        ) : (
+          <span className="text-white/30 text-xs">-</span>
+        )
+    },
+    {
+      header: "Expire a",
+      cell: (t: TokenItem) =>
+        t.expiresAt ? (
+          <span className="text-xs text-white/90">{new Date(t.expiresAt).toLocaleString()}</span>
+        ) : (
+          <span className="text-white/30 text-xs">-</span>
+        )
+    },
+    {
+      header: "Etat MikroTik",
+      cell: (t: TokenItem) => (
+        <div className="flex flex-col">
+          <span className="text-xs text-white/90">{t.mikrotikState || "UNKNOWN"}</span>
+          <span className="text-[10px] text-white/40">{t.boundDeviceId || "-"}</span>
+        </div>
+      )
+    },
     { 
       header: "Utilisé par", 
       cell: (t: TokenItem) => t.assignedCustomer ? (
@@ -153,6 +265,7 @@ export default function TokensPage() {
 
   return (
     <div className="space-y-8">
+      {routerAccess?.cloudRouterBlocked ? <LocalRouterOnlyBanner /> : null}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-cyan/10 text-cyan">
@@ -177,6 +290,14 @@ export default function TokensPage() {
           >
             <Layers className="w-4 h-4" />
             Imprimer lot
+          </button>
+          <button
+            onClick={handleSyncMikrotik}
+            disabled={syncing}
+            className="flex items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition disabled:opacity-60"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+            Synchroniser MikroTik
           </button>
           <Link 
             href="/dashboard/tokens/generate"

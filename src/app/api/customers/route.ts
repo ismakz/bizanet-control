@@ -36,8 +36,28 @@ export async function GET(req: Request) {
           take: 1,
           select: {
             id: true,
+            planId: true,
             networkActivationStatus: true
           }
+        },
+        assignedTokens: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            planId: true,
+            token: true,
+            status: true,
+          },
+        },
+        payments: {
+          where: { status: "APPROVED" },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            planId: true,
+          },
         }
       }
     });

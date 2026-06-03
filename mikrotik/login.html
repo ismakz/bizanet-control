@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion BizaNet</title>
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="expires" content="-1">
+<meta http-equiv="refresh" content="0; url=https://bizanetcontrol.online/hotspot/login?link-login=$(link-login)&amp;dst=$(link-orig)">
+<script type="text/javascript">
+(function () {
+  var base = "https://bizanetcontrol.online/hotspot/login";
+  var linkLogin = "$(link-login)";
+  if (!linkLogin || linkLogin.indexOf("$(") !== -1) {
+    linkLogin = "$(link-login-only)";
+  }
+  var dst = "$(link-orig)";
+  var username = "$(username)";
+  var password = "$(password)";
+  var params = [];
+
+  function add(name, value) {
+    if (value && value.indexOf("$(") === -1) {
+      params.push(name + "=" + encodeURIComponent(value));
+    }
+  }
+
+  add("link-login", linkLogin);
+  add("dst", dst);
+  add("username", username);
+  add("password", password);
+
+  var url = base + (params.length ? "?" + params.join("&") : "");
+  window.location.replace(url);
+})();
+</script>
+</head>
+<body>
+<p>Redirection vers le portail BizaNet&hellip;</p>
+<p>
+  <a href="https://bizanetcontrol.online/hotspot/login?link-login=$(link-login)&amp;dst=$(link-orig)">
+    Continuer
+  </a>
+</p>
+</body>
+</html>

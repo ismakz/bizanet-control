@@ -1,6 +1,10 @@
 import { X, Printer } from "lucide-react";
 import { formatDuration } from "@/lib/time";
-import { buildHotspotTicketLoginUrl } from "@/lib/hotspot-login-url";
+import {
+  buildHotspotTicketLoginUrl,
+  getHotspotTicketLoginDisplayUrl,
+  HOTSPOT_TICKET_LOGIN_ORIGIN,
+} from "@/lib/hotspot-login-url";
 import { QRCodeCanvas } from "qrcode.react";
 
 type BatchTokenPrintModalProps = {
@@ -43,7 +47,7 @@ export function BatchTokenPrintModal({ tokens, onClose }: BatchTokenPrintModalPr
               tokenData.plan.accessType === "HOTSPOT_WIFI";
             const activationUrl = isHotspotWifi
               ? buildHotspotTicketLoginUrl(tokenData.token)
-              : `${window.location.origin}/portal/activate?token=${tokenData.token}`;
+              : `${HOTSPOT_TICKET_LOGIN_ORIGIN}/portal/activate?token=${encodeURIComponent(tokenData.token)}`;
             
             return (
               <div 
@@ -93,7 +97,8 @@ export function BatchTokenPrintModal({ tokens, onClose }: BatchTokenPrintModalPr
                     <>
                       <p>1. Connectez-vous au WiFi hotspot</p>
                       <p>2. Scannez le QR (connexion auto)</p>
-                      <p>3. Code : {tokenData.token}</p>
+                      <p>3. Ou : {getHotspotTicketLoginDisplayUrl()}</p>
+                      <p>4. Code : {tokenData.token}</p>
                     </>
                   )}
                 </div>

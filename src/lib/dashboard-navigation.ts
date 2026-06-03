@@ -43,7 +43,6 @@ export function getNavigationByRole(role: Role): NavItem[] {
         { title: "Companies", href: "/dashboard/companies", icon: Building2 },
         { title: "Routers", href: "/dashboard/routers", icon: Server },
         { title: "Users", href: "/dashboard/users", icon: Users },
-        { title: "Audit Logs", href: "/dashboard/audit-logs", icon: FileText },
         { title: "Support View", href: "/dashboard/customers", icon: ShieldCheck },
       ];
     default:

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { BizaNetLogo } from "@/components/branding/BizaNetLogo";
+import { DesktopDownloadBlock } from "@/components/desktop/DesktopDownloadBlock";
 
 export function AdminLoginPage() {
   const router = useRouter();
@@ -35,7 +37,15 @@ export function AdminLoginPage() {
   return (
     <div className="mx-auto max-w-md">
       <div className="card p-6">
-        <h1 className="text-2xl font-semibold text-white">Connexion</h1>
+        <div className="flex flex-col items-center mb-6">
+          <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#050A10] to-[#0B131E] border border-white/10 flex items-center justify-center p-2 shadow-neon">
+            <BizaNetLogo className="h-full w-full object-contain" alt="BizaNet Control" />
+          </div>
+          <p className="mt-3 text-[10px] uppercase tracking-widest text-white/50">
+            BizaNet Control
+          </p>
+        </div>
+        <h1 className="text-2xl font-semibold text-white text-center">Connexion</h1>
         <p className="mt-2 text-sm text-white/60">
           Connectez-vous avec votre numéro de téléphone.
         </p>
@@ -83,6 +93,10 @@ export function AdminLoginPage() {
               Demander une inscription
             </a>
           </p>
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-white/10">
+          <DesktopDownloadBlock variant="inline" />
         </div>
       </div>
     </div>

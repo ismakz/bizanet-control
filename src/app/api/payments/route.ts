@@ -147,7 +147,7 @@ export async function POST(req: Request) {
           await prisma.customer.update({
             where: { id: customer.id },
             data: {
-              status: "ACTIVE",
+              status: "PENDING",
               expiresAt: expiresAt,
               routerId: routerId,
             }

@@ -11,6 +11,7 @@ import {
   Wifi, UserPlus, FilePlus, DollarSign, Clock, SearchX, CheckCircle, MapPin, KeyRound, Zap, Wallet
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { DesktopDownloadBlock } from "@/components/desktop/DesktopDownloadBlock";
 
 function isMissingColumnError(error: unknown): boolean {
   return (
@@ -71,6 +72,8 @@ export default async function DashboardPage() {
           <h1 className="text-3xl font-semibold tracking-tight text-white">Global Command Center</h1>
           <p className="text-sm text-white/60">Bienvenue, {user.fullName}. Voici un aperçu de vos activités globales.</p>
         </div>
+
+        <DesktopDownloadBlock variant="card" />
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Total Companies" value={companies} icon={Building2} trend="12%" trendUp={true} />

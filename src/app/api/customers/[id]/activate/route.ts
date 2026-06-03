@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { ensurePrismaConnection, prisma } from "@/lib/prisma";
 import { getAuthContextFromRequest } from "@/lib/auth";
 import { assertCompanyAccess, requireOneOfRoles } from "@/lib/permissions";
 import { Role } from "@prisma/client";
@@ -13,7 +13,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     const customer = await prisma.customer.findUnique({
       where: { id: params.id },
-      include: { router: true },
+      include: {
+        router: true,
+        subscriptions: {
+          where: { status: "ACTIVE" },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, planId: true, expiresAt: true },
+        },
+        assignedTokens: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, planId: true, status: true, token: true, accessType: true },
+        },
+      },
     });
 
     if (!customer) {
@@ -22,7 +35,28 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     assertCompanyAccess(auth, customer.companyId);
 
     const body = await req.json().catch(() => ({}));
-    let planId = body.planId;
+    let planId = body.planId as string | undefined;
+
+    if (!planId && customer.assignedTokens?.[0]?.planId) {
+      planId = customer.assignedTokens[0].planId;
+      console.log("[Customer Activate Auto Plan]", {
+        customerId: customer.id,
+        source: "assigned_token",
+        tokenId: customer.assignedTokens[0].id,
+        token: customer.assignedTokens[0].token,
+        planId,
+      });
+    }
+
+    if (!planId && customer.subscriptions?.[0]?.planId) {
+      planId = customer.subscriptions[0].planId;
+      console.log("[Customer Activate Auto Plan]", {
+        customerId: customer.id,
+        source: "active_subscription",
+        subscriptionId: customer.subscriptions[0].id,
+        planId,
+      });
+    }
 
     if (!planId) {
       const latestPayment = await prisma.payment.findFirst({
@@ -31,8 +65,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       });
       if (latestPayment && latestPayment.planId) {
         planId = latestPayment.planId;
+        console.log("[Customer Activate Auto Plan]", {
+          customerId: customer.id,
+          source: "latest_payment",
+          paymentId: latestPayment.id,
+          planId,
+        });
       } else {
-        return NextResponse.json({ error: "planId est requis pour l'activation" }, { status: 400 });
+        console.warn("[Customer Activate Missing Plan]", {
+          customerId: customer.id,
+          username: customer.username,
+        });
+        return NextResponse.json(
+          { error: "Aucun forfait trouvé pour ce client. Sélectionnez un forfait.", needsPlanSelection: true },
+          { status: 400 }
+        );
       }
     }
 
@@ -77,7 +124,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     await prisma.customer.update({
       where: { id: customer.id },
       data: {
-        status: "ACTIVE",
+        status: "PENDING",
         expiresAt: expiresAt,
         routerId: routerId,
       }
@@ -85,7 +132,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     try {
       await createHotspotUser(customer.id);
-      await activateUser(customer.id);
+      const { status, connected } = await activateUser(customer.id);
+      await ensurePrismaConnection();
+      if (!connected) {
+        return NextResponse.json({
+          success: true,
+          warning: `Utilisateur activé sur MikroTik. En attente de connexion WiFi (statut: ${status}).`,
+          subscription,
+        });
+      }
     } catch (e: any) {
       await writeAuditLog({
         auth,

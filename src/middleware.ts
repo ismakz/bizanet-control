@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { isHotspotLoginHostname } from '@/lib/hotspot-login-url';
+import {
+  buildLegacyHotspotLoginRedirectUrl,
+  isHotspotLoginHostname,
+  isLegacyHotspotLoginHostname,
+} from '@/lib/hotspot-login-url';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = request.headers.get('host') || request.nextUrl.hostname;
   const isHotspotHost = isHotspotLoginHostname(host);
+
+  // Anciens QR / DNS MikroTik (login.bizanet, preview vercel) → portail production
+  if (isLegacyHotspotLoginHostname(host)) {
+    const dest = buildLegacyHotspotLoginRedirectUrl(request.nextUrl.searchParams);
+    return NextResponse.redirect(dest, 308);
+  }
 
   // 1. Ajouter exceptions
   if (
@@ -59,7 +69,7 @@ export function middleware(request: NextRequest) {
   }
 
   // 4. Bonus : Si utilisateur connecté et va sur /login → redirect /dashboard
-  // (sauf portail hotspot login.bizanet)
+  // (sauf portail hotspot sur bizanetcontrol.online)
   if (pathname === '/login' && !isHotspotHost) {
     console.log(`[Middleware] pathname: ${pathname}, hasCookie: ${!!token}, isValid: ${isValid}, redirectTarget: ${isValid ? '/dashboard' : 'next'}`);
     if (isValid) {
@@ -97,6 +107,6 @@ export const config = {
      * Matcher global qui exclut les chemins statiques et les API d'auth.
      * Cela correspond aux exceptions demandées.
      */
-    '/((?!api/auth|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api/auth|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|offline.html|bizanet-logo.png).*)',
   ],
 };

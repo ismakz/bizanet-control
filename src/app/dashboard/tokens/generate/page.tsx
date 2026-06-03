@@ -15,6 +15,7 @@ export default function GenerateTokensPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agentWarning, setAgentWarning] = useState<string | null>(null);
   const [successTokens, setSuccessTokens] = useState<any[]>([]);
   const [selectedTokenToPrint, setSelectedTokenToPrint] = useState<any | null>(null);
 
@@ -46,6 +47,7 @@ export default function GenerateTokensPage() {
     e.preventDefault();
     setGenerating(true);
     setError(null);
+    setAgentWarning(null);
 
     try {
       const res = await fetch("/api/tokens", {
@@ -58,6 +60,7 @@ export default function GenerateTokensPage() {
       if (!res.ok) throw new Error(data.error || "Erreur de génération");
 
       setSuccessTokens(data.tokens);
+      if (data.agentMessage) setAgentWarning(data.agentMessage);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -78,6 +81,11 @@ export default function GenerateTokensPage() {
           </div>
           <h2 className="text-2xl font-bold text-white">Génération Réussie !</h2>
           <p className="text-white/60">{successTokens.length} token(s) ont été créés avec succès.</p>
+          {agentWarning ? (
+            <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+              {agentWarning}
+            </p>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">

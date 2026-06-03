@@ -19,6 +19,8 @@ La configuration Hotspot classique de MikroTik est requise.
 BizaNet utilisera `/ip hotspot user` pour créer et supprimer les comptes de connexion.
 Assurez-vous qu'un serveur Hotspot est opérationnel sur l'interface WiFi.
 
+**Fichier `login.html` (portail captif)** — remplacer le fichier sur le routeur par `mikrotik/login.html` du dépôt (WinBox → Files → dossier HTML du profil hotspot). Il redirige vers `https://bizanetcontrol.online/hotspot/login` en conservant `link-login`, `dst` (link-orig), `username` et `password`. Ne pas pointer vers `192.168.x.x:3000` ni `/hotspot`.
+
 ### B. Câble (Ethernet)
 BizaNet utilise la méthode "Hybrid DHCP / Simple Queues".
 1. Un serveur DHCP doit distribuer les adresses IP sur l'interface câblée.

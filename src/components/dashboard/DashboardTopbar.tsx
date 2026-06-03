@@ -4,19 +4,41 @@ import { LogoutButton } from "@/components/LogoutButton";
 import Link from "next/link";
 import { KeyRound, Menu, UserCircle } from "lucide-react";
 
-export function DashboardTopbar({ userName, role, onMenuClick }: { userName: string, role: string, onMenuClick?: () => void }) {
+export function DashboardTopbar({
+  userName,
+  role,
+  companyName,
+  onMenuClick,
+}: {
+  userName: string;
+  role: string;
+  companyName?: string;
+  onMenuClick?: () => void;
+}) {
+  const showCompany =
+    role === "COMPANY_ADMIN" && companyName && companyName.trim().length > 0;
+
   return (
     <header className="sticky top-0 z-10 h-16 border-b border-white/5 bg-[#050A10]/80 backdrop-blur-md flex items-center justify-between px-6">
-      <div className="flex items-center gap-4">
-        {/* Mobile Menu Button */}
-        <button 
-          className="lg:hidden p-2 -ml-2 text-white/70 hover:text-white rounded-lg hover:bg-white/5 transition"
+      <div className="flex items-center gap-4 min-w-0">
+        <button
+          className="lg:hidden p-2 -ml-2 text-white/70 hover:text-white rounded-lg hover:bg-white/5 transition shrink-0"
           onClick={onMenuClick}
+          type="button"
         >
           <Menu className="h-5 w-5" />
         </button>
-        {/* Placeholder for Breadcrumbs or Page Title */}
-        <div className="text-sm text-white/80 font-medium hidden sm:block">Dashboard</div>
+        <div className="min-w-0 hidden sm:block">
+          <div className="text-sm text-white/80 font-medium">Dashboard</div>
+          {showCompany ? (
+            <div
+              className="text-xs text-cyan truncate max-w-[220px] md:max-w-md"
+              title={companyName}
+            >
+              {companyName}
+            </div>
+          ) : null}
+        </div>
       </div>
       
       <div className="flex items-center gap-4">

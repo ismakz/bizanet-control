@@ -189,7 +189,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       await tx.customer.update({
         where: { id: payment.customerId! },
         data: {
-          status: "ACTIVE",
+          status: "PENDING",
           expiresAt: expiresAt,
           routerId: routerId,
         }
@@ -212,11 +212,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     try {
       const { createHotspotUser, activateUser } = await import("@/lib/mikrotik");
       await createHotspotUser(payment.customerId!);
-      await activateUser(payment.customerId!);
-      
+      const { connected, status } = await activateUser(payment.customerId!);
+
       await prisma.internetSubscription.update({
         where: { id: subscription.id },
-        data: { networkActivationStatus: "SUCCESS" }
+        data: {
+          networkActivationStatus: connected ? "SUCCESS" : "PENDING",
+        }
       });
 
       await writeAuditLog({
@@ -227,7 +229,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         message: `Client ${payment.customer.username} activé sur MikroTik via le paiement ${payment.id}.`,
       });
 
-      return NextResponse.json({ success: true, message: "Paiement approuvé et client activé avec succès.", payment: updatedPayment, subscription });
+      const message = connected
+        ? "Paiement approuvé et client connecté au hotspot."
+        : `Paiement approuvé. Hotspot activé — en attente de connexion WiFi (statut: ${status}).`;
+
+      return NextResponse.json({ success: true, message, payment: updatedPayment, subscription, connected });
     } catch (e: any) {
       await prisma.internetSubscription.update({
         where: { id: subscription.id },

@@ -4,27 +4,32 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Wifi, Loader2 } from "lucide-react";
 
-const DEFAULT_LOGIN_ACTION =
+/** POST natif vers le routeur MikroTik (pas d’API Next.js). */
+const MIKROTIK_LOGIN_ACTION =
   process.env.NEXT_PUBLIC_MIKROTIK_LOGIN_ACTION || "http://192.168.88.1/login";
+
+const DEFAULT_DST = "http://neverssl.com";
 
 function HotspotLoginForm() {
   const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
   const autoSubmitted = useRef(false);
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [status, setStatus] = useState<"connecting" | "manual">("manual");
+  const urlUsername = searchParams.get("username")?.trim().toUpperCase() || "";
+  const urlPassword = searchParams.get("password")?.trim() || "";
+  const hasAutoLogin = Boolean(urlUsername);
+
+  const [username, setUsername] = useState(urlUsername);
+  const [password, setPassword] = useState(urlPassword || urlUsername);
+  const [status, setStatus] = useState<"connecting" | "manual">(
+    hasAutoLogin ? "connecting" : "manual"
+  );
   const [error, setError] = useState<string | null>(null);
 
-  const linkLogin =
-    searchParams.get("link-login") ||
-    searchParams.get("link-login-only") ||
-    DEFAULT_LOGIN_ACTION;
   const dst =
     searchParams.get("dst") ||
     searchParams.get("link-orig") ||
-    "http://www.google.com";
+    DEFAULT_DST;
 
   useEffect(() => {
     const u = searchParams.get("username")?.trim().toUpperCase() || "";
@@ -34,16 +39,20 @@ function HotspotLoginForm() {
     if (p) setPassword(p);
     else if (u) setPassword(u);
 
-    if (u && !autoSubmitted.current) {
-      autoSubmitted.current = true;
-      setStatus("connecting");
-      const t = window.setTimeout(() => {
-        formRef.current?.requestSubmit();
-      }, 400);
-      return () => window.clearTimeout(t);
+    if (!u) {
+      setStatus("manual");
+      return;
     }
 
-    setStatus("manual");
+    if (autoSubmitted.current) return;
+    autoSubmitted.current = true;
+    setStatus("connecting");
+
+    const t = window.setTimeout(() => {
+      formRef.current?.requestSubmit();
+    }, 400);
+
+    return () => window.clearTimeout(t);
   }, [searchParams]);
 
   return (
@@ -53,16 +62,16 @@ function HotspotLoginForm() {
       </div>
 
       <div>
-        <h1 className="text-2xl font-bold">Connexion Internet</h1>
+        <h1 className="text-2xl font-bold">EMMANUEL NET</h1>
         <p className="text-sm text-white/60 mt-2">
-          Scannez votre ticket ou entrez votre code d&apos;accès
+          Connexion Internet
         </p>
       </div>
 
       {status === "connecting" && (
         <div className="flex items-center justify-center gap-2 text-cyan text-sm">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Connexion en cours…
+          Connexion...
         </div>
       )}
 
@@ -74,10 +83,19 @@ function HotspotLoginForm() {
 
       <form
         ref={formRef}
-        method="post"
-        action={linkLogin}
+        method="POST"
+        action={MIKROTIK_LOGIN_ACTION}
         className="space-y-4 text-left"
-        onSubmit={() => setStatus("connecting")}
+        onSubmit={(e) => {
+          if (!username.trim() || !password) {
+            e.preventDefault();
+            setError("Entrez votre code ticket");
+            setStatus("manual");
+            return;
+          }
+          setError(null);
+          setStatus("connecting");
+        }}
       >
         <input type="hidden" name="dst" value={dst} />
         <input type="hidden" name="popup" value="true" />
@@ -110,13 +128,6 @@ function HotspotLoginForm() {
 
         <button
           type="submit"
-          onClick={(e) => {
-            if (!username || !password) {
-              e.preventDefault();
-              setError("Entrez votre code ticket");
-              setStatus("manual");
-            }
-          }}
           className="w-full rounded-xl bg-cyan py-3.5 font-bold text-[#050A10] hover:bg-cyan/90 transition"
         >
           Se connecter
@@ -124,7 +135,7 @@ function HotspotLoginForm() {
       </form>
 
       <p className="text-[10px] text-white/40">
-        Un ticket = un seul appareil (profil standar1)
+        EMMANUEL NET &copy; 2026
       </p>
     </div>
   );

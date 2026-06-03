@@ -14,7 +14,9 @@ type CustomerItem = {
   status: string;
   expiresAt: string;
   routerId: string | null;
-  subscriptions?: { id: string; networkActivationStatus: string }[];
+  subscriptions?: { id: string; planId?: string | null; networkActivationStatus: string }[];
+  assignedTokens?: { id: string; token: string; status: string }[];
+  payments?: { id: string; planId?: string | null }[];
 };
 
 export default function CustomersPage() {
@@ -23,6 +25,8 @@ export default function CustomersPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [hotspotLoadingId, setHotspotLoadingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [planModalCustomerId, setPlanModalCustomerId] = useState<string | null>(null);
+  const [plans, setPlans] = useState<{ id: string; name: string }[]>([]);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
@@ -52,10 +56,16 @@ export default function CustomersPage() {
     fetchCustomers();
   }, []);
 
-  const activateCustomer = async (id: string) => {
-    const planId = prompt("Entrez le planId pour l'activation manuelle (laisser vide pour utiliser le dernier forfait) :");
+  useEffect(() => {
+    fetch("/api/plans")
+      .then((r) => (r.ok ? r.json() : { plans: [] }))
+      .then((d) => setPlans((d?.plans || []).map((p: any) => ({ id: p.id, name: p.name }))))
+      .catch(() => setPlans([]));
+  }, []);
+
+  const activateCustomer = async (id: string, planId?: string) => {
     const body = planId ? { planId } : {};
-    
+
     const res = await fetch(`/api/customers/${id}/activate`, { 
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -63,9 +73,14 @@ export default function CustomersPage() {
     });
     const data = await res.json();
     if (data.success) {
-      alert("Activé" + (data.warning ? ` (${data.warning})` : ""));
+      setToast({ kind: "ok", text: "Activé" + (data.warning ? ` (${data.warning})` : "") });
+      setPlanModalCustomerId(null);
     } else {
-      alert(`Erreur: ${data.error}`);
+      if (data.needsPlanSelection) {
+        setPlanModalCustomerId(id);
+      } else {
+        setToast({ kind: "err", text: `Erreur: ${data.error}` });
+      }
     }
     fetchCustomers();
   };
@@ -139,6 +154,33 @@ export default function CustomersPage() {
     { header: "Nom", accessorKey: "fullName" as const },
     { header: "Téléphone", accessorKey: "phone" as const },
     { header: "Username", accessorKey: "username" as const },
+    {
+      header: "Source activation",
+      cell: (c: CustomerItem) => {
+        const source = c.assignedTokens?.[0]?.id
+          ? "Activation auto ticket"
+          : c.subscriptions?.[0]?.planId
+            ? "Abonnement actif"
+            : c.payments?.[0]?.planId
+              ? "Paiement approuvé"
+              : "Forfait requis";
+
+        const color =
+          source === "Activation auto ticket"
+            ? "border-cyan/30 bg-cyan/10 text-cyan"
+            : source === "Abonnement actif"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+              : source === "Paiement approuvé"
+                ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-300"
+                : "border-red-500/30 bg-red-500/10 text-red-300";
+
+        return (
+          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${color}`}>
+            {source}
+          </span>
+        );
+      },
+    },
     { 
       header: "Statut", 
       cell: (c: CustomerItem) => <StatusBadge status={c.status} /> 
@@ -294,6 +336,36 @@ export default function CustomersPage() {
         keyExtractor={(c) => c.id} 
         emptyMessage="Aucun client enregistré"
       />
+
+      {planModalCustomerId ? (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#0B131E] p-4 text-white space-y-4">
+            <h3 className="text-sm font-semibold">Sélectionner un forfait</h3>
+            <p className="text-xs text-white/60">
+              Aucun forfait auto détecté pour ce client. Choisissez un forfait pour l'activation.
+            </p>
+            <div className="space-y-2 max-h-64 overflow-auto">
+              {plans.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => activateCustomer(planModalCustomerId, p.id)}
+                  className="w-full text-left rounded border border-white/10 bg-white/5 px-3 py-2 text-xs hover:bg-white/10"
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setPlanModalCustomerId(null)}
+                className="rounded border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

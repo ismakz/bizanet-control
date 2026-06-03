@@ -1,0 +1,12 @@
+-- AlterEnum
+ALTER TYPE "TokenStatus" ADD VALUE 'SUSPENDED';
+
+-- AlterTable
+ALTER TABLE "access_tokens"
+ADD COLUMN "totalSeconds" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "remainingSeconds" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "consumedSeconds" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "lastConnectedAt" TIMESTAMP(3),
+ADD COLUMN "lastDisconnectedAt" TIMESTAMP(3),
+ADD COLUMN "isOnline" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "expiredAt" TIMESTAMP(3);

@@ -26,11 +26,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     try {
       const { activateUser, createHotspotUser } = await import("@/lib/mikrotik");
       await createHotspotUser(subscription.customerId);
-      await activateUser(subscription.customerId);
+      const { connected, status } = await activateUser(subscription.customerId);
 
       await prisma.internetSubscription.update({
         where: { id: subscription.id },
-        data: { networkActivationStatus: "SUCCESS" }
+        data: { networkActivationStatus: connected ? "SUCCESS" : "PENDING" },
       });
 
       await writeAuditLog({
@@ -38,10 +38,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         companyId: subscription.companyId,
         action: "RETRY_ACTIVATION_SUCCESS",
         entityType: "InternetSubscription",
-        message: `Nouvelle tentative d'activation réussie pour le client ${subscription.customer.username}.`,
+        message: connected
+          ? `Session hotspot active pour ${subscription.customer.username}.`
+          : `Hotspot activé pour ${subscription.customer.username}, en attente de connexion (statut: ${status}).`,
       });
 
-      return NextResponse.json({ success: true, message: "Activation réseau réussie !" });
+      const message = connected
+        ? "Session hotspot active — client connecté."
+        : `Utilisateur hotspot activé. En attente de connexion WiFi (statut: ${status}).`;
+
+      return NextResponse.json({ success: true, connected, status, message });
     } catch (error: any) {
       await writeAuditLog({
         auth,

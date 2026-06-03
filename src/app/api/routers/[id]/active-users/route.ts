@@ -4,9 +4,14 @@ import { getAuthContextFromRequest } from "@/lib/auth";
 import { assertCompanyAccess, requireOneOfRoles } from "@/lib/permissions";
 import { Role } from "@prisma/client";
 import { getActiveUsers } from "@/lib/mikrotik";
+import { cloudRouterBlockedResponse, isCloudRouterBlocked } from "@/lib/router-access";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
+    if (isCloudRouterBlocked()) {
+      return NextResponse.json(cloudRouterBlockedResponse({ activeUsers: [] }));
+    }
+
     const auth = await getAuthContextFromRequest(req);
     requireOneOfRoles(auth, [Role.BIZANET_CEO, Role.COMPANY_ADMIN, Role.COMPANY_AGENT]);
 
