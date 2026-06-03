@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Search, ServerCrash, RefreshCw, KeyRound, User, ChevronRight } from "lucide-react";
+import { DesktopDownloadBlock } from "@/components/desktop/DesktopDownloadBlock";
 
 export default function SupportPage() {
   const [query, setQuery] = useState("");
@@ -44,6 +45,8 @@ export default function SupportPage() {
           <p className="text-sm text-white/50 mt-1">Recherchez un client ou un token pour diagnostiquer les problèmes.</p>
         </div>
       </div>
+
+      <DesktopDownloadBlock variant="card" />
 
       <form onSubmit={handleSearch} className="flex gap-4">
         <input 

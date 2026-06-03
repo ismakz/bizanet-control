@@ -107,6 +107,6 @@ export const config = {
      * Matcher global qui exclut les chemins statiques et les API d'auth.
      * Cela correspond aux exceptions demandées.
      */
-    '/((?!api/auth|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api/auth|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|offline.html|bizanet-logo.png).*)',
   ],
 };

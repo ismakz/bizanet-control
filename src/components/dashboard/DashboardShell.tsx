@@ -3,6 +3,7 @@
 import { ReactNode, useState } from "react";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { DashboardTopbar } from "./DashboardTopbar";
+import { PwaInstallHint } from "@/components/pwa/PwaInstallHint";
 
 interface DashboardShellProps {
   children: ReactNode;
@@ -38,6 +39,7 @@ export function DashboardShell({ children, userName, role, companyName }: Dashbo
             {children}
           </div>
         </main>
+        <PwaInstallHint />
       </div>
     </div>
   );

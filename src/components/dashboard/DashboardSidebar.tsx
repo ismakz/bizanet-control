@@ -22,7 +22,6 @@ const roleNavMap: Record<string, any[]> = {
     { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { title: "Companies", href: "/dashboard/companies", icon: Building2 },
     { title: "Routers", href: "/dashboard/routers", icon: Server },
-    { title: "Audit Logs", href: "/dashboard/audit-logs", icon: FileText },
     { title: "Support View", href: "/dashboard/customers", icon: ShieldCheck },
   ],
   COMPANY_ADMIN: [

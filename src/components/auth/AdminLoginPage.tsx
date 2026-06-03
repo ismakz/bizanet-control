@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BizaNetLogo } from "@/components/branding/BizaNetLogo";
+import { DesktopDownloadBlock } from "@/components/desktop/DesktopDownloadBlock";
 
 export function AdminLoginPage() {
   const router = useRouter();
@@ -92,6 +93,10 @@ export function AdminLoginPage() {
               Demander une inscription
             </a>
           </p>
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-white/10">
+          <DesktopDownloadBlock variant="inline" />
         </div>
       </div>
     </div>
