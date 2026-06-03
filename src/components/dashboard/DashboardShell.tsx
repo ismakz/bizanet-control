@@ -26,10 +26,11 @@ export function DashboardShell({ children, userName, role, companyName }: Dashbo
       
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
-        <DashboardTopbar 
-          userName={userName} 
-          role={role} 
-          onMenuClick={() => setIsSidebarOpen(true)} 
+        <DashboardTopbar
+          userName={userName}
+          role={role}
+          companyName={companyName}
+          onMenuClick={() => setIsSidebarOpen(true)}
         />
         
         <main className="flex-1 p-4 md:p-8 overflow-y-auto relative">

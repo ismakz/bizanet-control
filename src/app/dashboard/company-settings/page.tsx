@@ -26,7 +26,9 @@ export default async function CompanySettingsPage() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Paramètres de l'entreprise</h1>
-        <p className="text-sm text-white/50">Gérez l'identité visuelle de votre entreprise.</p>
+        <p className="text-sm text-white/50">
+          Modifiez le nom de votre cybercafé et le logo affichés partout dans BizaNet Control.
+        </p>
       </div>
 
       <CompanySettingsClient company={company} />

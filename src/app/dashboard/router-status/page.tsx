@@ -87,7 +87,15 @@ export default function RouterStatusPage() {
       });
   }, []);
 
+  useEffect(() => {
+    if (editingRouter) {
+      console.log("[ROUTER CONFIG] modal rendered");
+    }
+  }, [editingRouter]);
+
   const openEdit = (router: RouterItem) => {
+    console.log("[ROUTER CONFIG] button clicked");
+    console.log("[ROUTER CONFIG] modal opening");
     setEditingRouter(router);
     setForm({
       name: router.name,
@@ -138,9 +146,20 @@ export default function RouterStatusPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const raw = await res.text();
+    const data = (() => {
+      try {
+        return raw ? JSON.parse(raw) : {};
+      } catch {
+        return {
+          ok: false,
+          error: "Réponse API invalide (non JSON)",
+          details: raw.slice(0, 180),
+        };
+      }
+    })();
     if (!res.ok) {
-      setError(data.error || "Impossible d'enregistrer la configuration routeur.");
+      setError(data.error || data.details || "Impossible d'enregistrer la configuration routeur.");
       setSaving(false);
       return;
     }
@@ -210,43 +229,45 @@ export default function RouterStatusPage() {
         <div className="rounded-xl border border-green-400/30 bg-green-500/10 px-4 py-3 text-sm text-green-200">{message}</div>
       ) : null}
       {editingRouter ? (
-        <div className="card space-y-4 p-5">
-          <h2 className="text-base font-semibold text-white">Modifier MikroTik</h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Nom du routeur" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
-            <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Host / IP / domaine" value={form.host} onChange={(e) => setForm((p) => ({ ...p, host: e.target.value }))} />
-            <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="API Port" value={form.apiPort} onChange={(e) => setForm((p) => ({ ...p, apiPort: e.target.value }))} />
-            <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Username API" value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} />
-            <input type="password" className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Nouveau password (optionnel)" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
-            <input type="password" className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Confirmer Password" value={form.confirmPassword} onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))} />
-            <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Emplacement (optionnel)" value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))} />
-            <select className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" value={form.networkMode} onChange={(e) => setForm((p) => ({ ...p, networkMode: e.target.value as "mock" | "live" | "" }))}>
-              <option value="">Mode réseau (auto)</option>
-              <option value="live">live</option>
-              <option value="mock">mock</option>
-            </select>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => testRouter(editingRouter.id)}
-              disabled={testingId === editingRouter.id}
-              className="rounded border border-blue-500/30 bg-blue-600/20 px-3 py-2 text-xs font-medium text-blue-300 hover:bg-blue-600/30 disabled:opacity-60"
-            >
-              {testingId === editingRouter.id ? "Test en cours..." : "Tester connexion"}
-            </button>
-            <button
-              onClick={saveRouter}
-              disabled={saving}
-              className="rounded border border-emerald-500/30 bg-emerald-600/20 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-600/30 disabled:opacity-60"
-            >
-              {saving ? "Enregistrement..." : "Enregistrer"}
-            </button>
-            <button
-              onClick={closeEdit}
-              className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 hover:bg-white/10"
-            >
-              Annuler
-            </button>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card w-full max-w-3xl space-y-4 p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-white">Modifier MikroTik</h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Nom du routeur" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
+              <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Host / IP / domaine" value={form.host} onChange={(e) => setForm((p) => ({ ...p, host: e.target.value }))} />
+              <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="API Port" value={form.apiPort} onChange={(e) => setForm((p) => ({ ...p, apiPort: e.target.value }))} />
+              <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Username API" value={form.username} onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))} />
+              <input type="password" className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Nouveau password (optionnel)" value={form.password} onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))} />
+              <input type="password" className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Confirmer Password" value={form.confirmPassword} onChange={(e) => setForm((p) => ({ ...p, confirmPassword: e.target.value }))} />
+              <input className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" placeholder="Emplacement (optionnel)" value={form.location} onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))} />
+              <select className="rounded border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" value={form.networkMode} onChange={(e) => setForm((p) => ({ ...p, networkMode: e.target.value as "mock" | "live" | "" }))}>
+                <option value="">Mode réseau (auto)</option>
+                <option value="live">live</option>
+                <option value="mock">mock</option>
+              </select>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => testRouter(editingRouter.id)}
+                disabled={testingId === editingRouter.id}
+                className="rounded border border-blue-500/30 bg-blue-600/20 px-3 py-2 text-xs font-medium text-blue-300 hover:bg-blue-600/30 disabled:opacity-60"
+              >
+                {testingId === editingRouter.id ? "Test en cours..." : "Tester connexion"}
+              </button>
+              <button
+                onClick={saveRouter}
+                disabled={saving}
+                className="rounded border border-emerald-500/30 bg-emerald-600/20 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-600/30 disabled:opacity-60"
+              >
+                {saving ? "Enregistrement..." : "Enregistrer"}
+              </button>
+              <button
+                onClick={closeEdit}
+                className="rounded border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-white/80 hover:bg-white/10"
+              >
+                Annuler
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

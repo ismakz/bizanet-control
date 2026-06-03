@@ -27,17 +27,38 @@ const patchSchema = z.object({
   status: z.nativeEnum(RouterStatus).optional(),
 });
 
+function detailsFromError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return "unknown_error";
+  }
+}
+
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
+    const routerId = String(params?.id || "").trim();
+    if (!routerId) {
+      return NextResponse.json(
+        { ok: false, error: "ID routeur manquant", details: "missing_router_id" },
+        { status: 400 }
+      );
+    }
+
     const auth = await getAuthContextFromRequest(req);
     requireRole(auth, [Role.BIZANET_CEO, Role.COMPANY_ADMIN]);
 
     const existing = await prisma.router.findUnique({
-      where: { id: params.id },
+      where: { id: routerId },
       select: { id: true, companyId: true, name: true, encryptedPassword: true },
     });
     if (!existing) {
-      return NextResponse.json({ error: "Router introuvable" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "Router introuvable", details: "router_not_found" },
+        { status: 404 }
+      );
     }
     assertCompanyAccess(auth, existing.companyId);
 
@@ -50,7 +71,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     let router: Record<string, unknown>;
     try {
       router = await prisma.router.update({
-        where: { id: params.id },
+        where: { id: routerId },
         data: {
           name: parsed.name,
           host: parsed.host,
@@ -80,7 +101,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     } catch (error) {
       if (!isMissingColumnError(error)) throw error;
       const legacyRouter = await prisma.router.update({
-        where: { id: params.id },
+        where: { id: routerId },
         data: {
           name: parsed.name,
           host: parsed.host,
@@ -127,14 +148,30 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       });
     }
 
-    return NextResponse.json({ router });
+    return NextResponse.json({ ok: true, router });
   } catch (e: unknown) {
     if (e instanceof z.ZodError) {
-      return NextResponse.json({ error: e.issues.map((i) => i.message).join(", ") }, { status: 400 });
+      const details = e.issues.map((i) => i.message).join(", ");
+      return NextResponse.json(
+        { ok: false, error: "Payload invalide", details },
+        { status: 400 }
+      );
     }
-    if (e instanceof Error && (e.message === "UNAUTHENTICATED" || e.message.startsWith("FORBIDDEN"))) {
-      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    if (e instanceof Error && e.message === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { ok: false, error: "Authentification requise", details: e.message },
+        { status: 401 }
+      );
     }
-    return NextResponse.json({ error: "Impossible de modifier le router" }, { status: 500 });
+    if (e instanceof Error && e.message.startsWith("FORBIDDEN")) {
+      return NextResponse.json(
+        { ok: false, error: "Accès refusé", details: e.message },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json(
+      { ok: false, error: "Impossible de modifier le router", details: detailsFromError(e) },
+      { status: 500 }
+    );
   }
 }

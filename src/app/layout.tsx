@@ -3,7 +3,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "BizaNet Control",
-  description: "Internet business control for Starlink-powered networks."
+  description: "Internet business control for Starlink-powered networks.",
+  icons: {
+    icon: "/bizanet-logo.png",
+    apple: "/bizanet-logo.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

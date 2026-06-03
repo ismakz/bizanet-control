@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Rocket } from "lucide-react";
+import { Rocket } from "lucide-react";
+import { BizaNetLogo } from "@/components/branding/BizaNetLogo";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -81,8 +82,8 @@ export default function RegisterPage() {
   return (
     <div className="mx-auto max-w-2xl py-8">
       <div className="text-center mb-8">
-        <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan/60 to-blue/40 shadow-neon flex items-center justify-center">
-          <Building2 className="w-8 h-8 text-white" />
+        <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-[#050A10] to-[#0B131E] border border-white/10 shadow-neon flex items-center justify-center p-2">
+          <BizaNetLogo className="w-full h-full object-contain" alt="BizaNet Control" />
         </div>
         <h1 className="text-3xl font-semibold text-white tracking-tight">Rejoignez BizaNet</h1>
         <p className="mt-2 text-white/60">

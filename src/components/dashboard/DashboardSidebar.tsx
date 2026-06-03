@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Users, Building2, Server, FileText, CreditCard, Box, LifeBuoy, ShieldCheck, ClipboardList, Wallet, X, KeyRound, Zap, UserCircle, Smartphone, Settings } from "lucide-react";
+import { BizaNetLogo } from "@/components/branding/BizaNetLogo";
 
 const roleNavMap: Record<string, any[]> = {
   BIZANET_CEO: [
@@ -65,8 +66,8 @@ export function DashboardSidebar({ role, companyName, isOpen, setIsOpen }: { rol
       <aside className={`fixed inset-y-0 left-0 w-64 border-r border-white/5 bg-[#0B131E] flex flex-col z-30 transition-transform duration-300 lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-white/5">
           <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[#050A10] to-[#0B131E] shadow-neon flex items-center justify-center overflow-hidden">
-            <img src="/bizanet-logo.png" alt="BizaNet Logo" className="w-full h-full object-cover" />
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[#050A10] to-[#0B131E] shadow-neon flex items-center justify-center overflow-hidden p-0.5">
+            <BizaNetLogo className="w-full h-full object-contain" alt="BizaNet Control" />
           </div>
           <div className="leading-tight">
             <div className="text-[10px] text-white/50 tracking-wider uppercase">BizaNet Control</div>
